@@ -1,9 +1,7 @@
 use crate::golden_hour::{GoldenHourInfo, GoldenHourService};
-use crate::photography_tips::{PhotographyTips, PhotographyTipsService};
+use crate::photography_tips::PhotographyTipsService;
 use crate::solar::{AuroraForecast, SolarService};
-use crate::weather::{
-    analyze_weather_for_photography, WeatherAnalysis, WeatherForecast, WeatherService,
-};
+use crate::weather::{analyze_weather_for_photography, WeatherAnalysis, WeatherService};
 use chrono::{DateTime, Local, Timelike};
 use colored::*;
 
@@ -39,12 +37,58 @@ impl PhotographyDashboard {
         let current_time = Local::now();
 
         // Получаем данные о погоде
-        let weather_forecast = self.weather_service.get_weather_forecast().await?;
+        let weather_forecast = match self.weather_service.get_weather_forecast().await {
+            Ok(forecast) => forecast,
+            Err(e) => {
+                eprintln!(
+                    "{}",
+                    "❌ ОШИБКА ПОЛУЧЕНИЯ ДАННЫХ ПОГОДЫ В ДАШБОРДЕ".bold().red()
+                );
+                eprintln!("Причина: {}", e);
+                eprintln!(
+                    "{}",
+                    "💡 РЕШЕНИЕ: Проверьте API ключ или используйте demo_key".yellow()
+                );
+                return Err(e.into());
+            }
+        };
         let weather_analysis = analyze_weather_for_photography(&weather_forecast);
 
         // Получаем данные о солнечной активности
-        let solar_wind_data = self.solar_service.get_solar_wind_data().await?;
-        let geomagnetic_data = self.solar_service.get_geomagnetic_data().await?;
+        let solar_wind_data = match self.solar_service.get_solar_wind_data().await {
+            Ok(data) => data,
+            Err(e) => {
+                eprintln!(
+                    "{}",
+                    "❌ ОШИБКА ПОЛУЧЕНИЯ ДАННЫХ СОЛНЕЧНОЙ АКТИВНОСТИ В ДАШБОРДЕ"
+                        .bold()
+                        .red()
+                );
+                eprintln!("Причина: {}", e);
+                eprintln!(
+                    "{}",
+                    "💡 РЕШЕНИЕ: Используются демонстрационные данные".yellow()
+                );
+                return Err(e.into());
+            }
+        };
+        let geomagnetic_data = match self.solar_service.get_geomagnetic_data().await {
+            Ok(data) => data,
+            Err(e) => {
+                eprintln!(
+                    "{}",
+                    "❌ ОШИБКА ПОЛУЧЕНИЯ ГЕОМАГНИТНЫХ ДАННЫХ В ДАШБОРДЕ"
+                        .bold()
+                        .red()
+                );
+                eprintln!("Причина: {}", e);
+                eprintln!(
+                    "{}",
+                    "💡 РЕШЕНИЕ: Используются демонстрационные данные".yellow()
+                );
+                return Err(e.into());
+            }
+        };
         let aurora_forecast = self
             .solar_service
             .predict_aurora(&solar_wind_data, &geomagnetic_data);
@@ -74,8 +118,6 @@ impl PhotographyDashboard {
         golden_hour_info: &GoldenHourInfo,
         current_time: DateTime<Local>,
     ) -> bool {
-        let current_hour = current_time.hour() as usize;
-
         // Проверяем, попадает ли текущее время в золотой час
         (current_time >= golden_hour_info.golden_hour_morning_start
             && current_time <= golden_hour_info.golden_hour_morning_end)
@@ -114,13 +156,17 @@ impl PhotographyDashboard {
         if is_golden_hour_today {
             key_highlights.push("Сегодня золотой час - идеальное время для съемки!".to_string());
         } else {
-            let current_hour = current_time.hour() as usize;
-            if current_hour >= golden_hour_info.golden_hour_morning_start.hour() as usize
-                && current_hour <= golden_hour_info.golden_hour_morning_end.hour() as usize
+            let _current_hour = current_time.hour() as usize;
+            if current_time.hour() as usize
+                >= golden_hour_info.golden_hour_morning_start.hour() as usize
+                && current_time.hour() as usize
+                    <= golden_hour_info.golden_hour_morning_end.hour() as usize
             {
                 key_highlights.push("Сейчас золотой час утром!".to_string());
-            } else if current_hour >= golden_hour_info.golden_hour_evening_start.hour() as usize
-                && current_hour <= golden_hour_info.golden_hour_evening_end.hour() as usize
+            } else if current_time.hour() as usize
+                >= golden_hour_info.golden_hour_evening_start.hour() as usize
+                && current_time.hour() as usize
+                    <= golden_hour_info.golden_hour_evening_end.hour() as usize
             {
                 key_highlights.push("Сейчас золотой час вечером!".to_string());
             }

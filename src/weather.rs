@@ -1,7 +1,6 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use colored::*;
-use reqwest;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,25 +60,92 @@ impl WeatherService {
         }
 
         // Получаем координаты города
-        let coords = self.get_city_coordinates().await?;
-        
+        let coords = match self.get_city_coordinates().await {
+            Ok(coords) => coords,
+            Err(e) => {
+                eprintln!("{}", "❌ ОШИБКА ПОЛУЧЕНИЯ КООРДИНАТ ГОРОДА".bold().red());
+                eprintln!("Причина: {}", e);
+                eprintln!("{}", "💡 РЕШЕНИЕ: Проверьте правильность названия города или используйте demo_key для демонстрации".yellow());
+                return self.get_mock_forecast();
+            }
+        };
+
         // Получаем прогноз погоды
         let url = format!(
             "https://api.openweathermap.org/data/3.0/onecall?lat={}&lon={}&exclude=current,minutely,daily,alerts&units=metric&appid={}",
             coords.lat, coords.lon, self.api_key
         );
 
-        let response = reqwest::get(&url).await?;
-        
+        let response = match reqwest::get(&url).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                eprintln!("{}", "❌ ОШИБКА ПОДКЛЮЧЕНИЯ К API ПОГОДЫ".bold().red());
+                eprintln!("Причина: {}", e);
+                eprintln!(
+                    "{}",
+                    "💡 РЕШЕНИЕ: Проверьте интернет-соединение или используйте demo_key".yellow()
+                );
+                return self.get_mock_forecast();
+            }
+        };
+
         if !response.status().is_success() {
-            eprintln!("Ошибка API: {}", response.status());
+            let status = response.status();
+            eprintln!("{}", "❌ ОШИБКА API ПОГОДЫ".bold().red());
+            eprintln!("HTTP статус: {}", status);
+
+            match status.as_u16() {
+                401 => {
+                    eprintln!("{}", "🔑 ПРОБЛЕМА: Неверный API ключ".bold().yellow());
+                    eprintln!("{}", "💡 РЕШЕНИЕ:".yellow());
+                    eprintln!(
+                        "   1. Получите бесплатный API ключ на https://openweathermap.org/api"
+                    );
+                    eprintln!(
+                        "   2. Установите переменную окружения: export WEATHER_API_KEY=ваш_ключ"
+                    );
+                    eprintln!("   3. Или используйте demo_key для демонстрации");
+                }
+                429 => {
+                    eprintln!("{}", "⏰ ПРОБЛЕМА: Превышен лимит запросов".bold().yellow());
+                    eprintln!(
+                        "{}",
+                        "💡 РЕШЕНИЕ: Подождите несколько минут или используйте demo_key".yellow()
+                    );
+                }
+                404 => {
+                    eprintln!("{}", "📍 ПРОБЛЕМА: Город не найден".bold().yellow());
+                    eprintln!(
+                        "{}",
+                        "💡 РЕШЕНИЕ: Проверьте правильность названия города".yellow()
+                    );
+                }
+                _ => {
+                    eprintln!(
+                        "{}",
+                        "💡 РЕШЕНИЕ: Используйте demo_key для демонстрации или попробуйте позже"
+                            .yellow()
+                    );
+                }
+            }
             return self.get_mock_forecast();
         }
 
-        let weather_response: OpenWeatherResponse = response.json().await?;
-        
+        let weather_response: OpenWeatherResponse = match response.json().await {
+            Ok(data) => data,
+            Err(e) => {
+                eprintln!("{}", "❌ ОШИБКА ПАРСИНГА ДАННЫХ ПОГОДЫ".bold().red());
+                eprintln!("Причина: {}", e);
+                eprintln!(
+                    "{}",
+                    "💡 РЕШЕНИЕ: Используйте demo_key для демонстрации".yellow()
+                );
+                return self.get_mock_forecast();
+            }
+        };
+
         let mut forecast = WeatherForecast { hourly: Vec::new() };
-        
+
         for hourly_data in weather_response.hourly.iter().take(24) {
             let weather_data = WeatherData {
                 temperature: hourly_data.temp,
@@ -88,11 +154,13 @@ impl WeatherService {
                 cloud_cover: hourly_data.clouds,
                 visibility: hourly_data.visibility.unwrap_or(10.0) / 1000.0, // конвертируем в км
                 precipitation_probability: hourly_data.pop * 100.0, // конвертируем в проценты
-                description: hourly_data.weather.first()
+                description: hourly_data
+                    .weather
+                    .first()
                     .map(|w| w.description.clone())
                     .unwrap_or_else(|| "Неизвестно".to_string()),
                 timestamp: DateTime::from_timestamp(hourly_data.dt, 0)
-                    .unwrap_or_else(|| Utc::now())
+                    .unwrap_or_else(Utc::now)
                     .with_timezone(&Utc),
             };
             forecast.hourly.push(weather_data);
@@ -108,19 +176,22 @@ impl WeatherService {
         );
 
         let response = reqwest::get(&url).await?;
-        
+
         if !response.status().is_success() {
-            // Возвращаем координаты Москвы по умолчанию
-            return Ok(CityCoordinates { lat: 55.7558, lon: 37.6176 });
+            let status = response.status();
+            return Err(anyhow::anyhow!(
+                "HTTP ошибка {} при получении координат города '{}'",
+                status,
+                self.city
+            ));
         }
 
         let coords: Vec<CityCoordinates> = response.json().await?;
-        
+
         if let Some(coord) = coords.first() {
             Ok(coord.clone())
         } else {
-            // Возвращаем координаты Москвы по умолчанию
-            Ok(CityCoordinates { lat: 55.7558, lon: 37.6176 })
+            Err(anyhow::anyhow!("Город '{}' не найден", self.city))
         }
     }
 
