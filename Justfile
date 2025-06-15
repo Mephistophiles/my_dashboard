@@ -64,7 +64,7 @@ clean:
     cargo clean
 
 # Проверка всех тестов и качества кода
-check: fmt-check lint clippy test
+check: fmt-check lint clippy test coverage-strict
 
 # Полная проверка перед коммитом
 pre-commit: check build

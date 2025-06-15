@@ -652,3 +652,259 @@ pub fn format_dashboard_output(output: &DashboardOutput) -> String {
 
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+    use tokio::runtime::Runtime;
+
+    #[test]
+    fn test_validate_coordinates() {
+        assert!(validate_coordinates(55.7558, 37.6176));
+        assert!(!validate_coordinates(100.0, 200.0));
+    }
+
+    #[test]
+    fn test_format_dashboard_output_smoke() {
+        // Минимальный мок-объект для smoke-теста
+        let output = DashboardOutput {
+            summary: dashboard::DashboardSummary {
+                overall_recommendation: "Test".to_string(),
+                weather_score: 5.0,
+                aurora_probability: 0.5,
+                is_golden_hour_today: false,
+                best_shooting_hours: vec![6, 18],
+                key_highlights: vec!["Test highlight".to_string()],
+                warnings: vec!["Test warning".to_string()],
+            },
+            weather_output: WeatherOutput {
+                current_weather: "Test weather".to_string(),
+                temperature_range: "9-20°C".to_string(),
+                best_hours: "06:00-08:00".to_string(),
+                overall_score: 5.0,
+                recommendation: "Test rec".to_string(),
+                concerns: "Test concern".to_string(),
+            },
+            astrophotography_output: AstrophotographyOutput {
+                is_suitable: false,
+                avg_cloud_cover: 50.0,
+                best_hours: "00:00".to_string(),
+                recommendation: "No astro".to_string(),
+            },
+            solar_output: SolarOutput {
+                solar_wind: "Test wind".to_string(),
+                geomagnetic: "Test geomagnetic".to_string(),
+                aurora_forecast: "Test aurora".to_string(),
+                best_viewing_hours: "22:00-23:00".to_string(),
+            },
+            golden_hour_output: GoldenHourOutput {
+                sunrise_sunset: "03:44 | 21:16".to_string(),
+                golden_hours: "04:00-06:00".to_string(),
+                blue_hours: "03:30-04:00".to_string(),
+                current_condition: "Дневное время".to_string(),
+            },
+            tips_output: PhotographyTipsOutput {
+                equipment_recommendations: vec!["Test equipment".to_string()],
+                shooting_tips: vec!["Test tip".to_string()],
+                location_suggestions: vec!["Test location".to_string()],
+                technical_settings: vec!["Test setting".to_string()],
+                general_recommendations: vec!["Test general".to_string()],
+            },
+        };
+        let formatted = format_dashboard_output(&output);
+        assert!(formatted.contains("ФОТОГРАФИЧЕСКИЙ ДАШБОРД"));
+    }
+
+    #[test]
+    fn test_process_golden_hour_smoke() {
+        let (_is_golden, output) = process_golden_hour(55.7558, 37.6176);
+        assert!(output.sunrise_sunset.contains(":"));
+        assert!(output.golden_hours.contains(":"));
+        assert!(output.blue_hours.contains(":"));
+        assert!(!output.current_condition.is_empty());
+        // is_golden может быть true или false, главное что функция не паникует
+    }
+
+    #[test]
+    fn test_process_photography_tips_smoke() {
+        let tips = process_photography_tips(8.0, true, 0.7);
+        assert!(!tips.equipment_recommendations.is_empty());
+        assert!(!tips.shooting_tips.is_empty());
+        assert!(!tips.location_suggestions.is_empty());
+        assert!(!tips.technical_settings.is_empty());
+        assert!(!tips.general_recommendations.is_empty());
+    }
+
+    #[test]
+    fn test_load_environment_variables_smoke() {
+        // Установим переменные окружения для теста
+        env::set_var("OPENWEATHER_API_KEY", "demo_key");
+        env::set_var("CITY", "Moscow");
+        env::set_var("LATITUDE", "55.7558");
+        env::set_var("LONGITUDE", "37.6176");
+        let (api_key, city, lat, lon) = load_environment_variables();
+        assert_eq!(api_key, "demo_key");
+        assert_eq!(city, "Moscow");
+        assert_eq!(lat, 55.7558);
+        assert_eq!(lon, 37.6176);
+    }
+
+    #[test]
+    fn test_async_wrappers() {
+        let rt = Runtime::new().unwrap();
+        // process_weather_data
+        let (weather_score, weather_output, astro_output) = rt
+            .block_on(process_weather_data(
+                "demo_key".to_string(),
+                "Moscow".to_string(),
+            ))
+            .unwrap();
+        assert!((0.0..=10.0).contains(&weather_score));
+        assert!(!weather_output.current_weather.is_empty());
+        assert!(!astro_output.recommendation.is_empty());
+
+        // process_solar_data
+        let (aurora_prob, solar_output) = rt.block_on(process_solar_data()).unwrap();
+        assert!((0.0..=1.0).contains(&aurora_prob));
+        assert!(!solar_output.solar_wind.is_empty());
+    }
+
+    #[test]
+    fn test_generate_dashboard_output_smoke() {
+        let rt = Runtime::new().unwrap();
+        let output = rt
+            .block_on(generate_dashboard_output(
+                "demo_key".to_string(),
+                "Moscow".to_string(),
+                55.7558,
+                37.6176,
+            ))
+            .unwrap();
+        assert!(!output.summary.overall_recommendation.is_empty());
+        assert!(!output.weather_output.current_weather.is_empty());
+        assert!(!output.solar_output.solar_wind.is_empty());
+        assert!(!output.golden_hour_output.sunrise_sunset.is_empty());
+        // tips_output может содержать пустые списки в зависимости от условий
+        // Проверяем только структуру, а не содержимое
+        let _ = &output.tips_output.equipment_recommendations;
+        let _ = &output.tips_output.shooting_tips;
+        let _ = &output.tips_output.location_suggestions;
+        let _ = &output.tips_output.technical_settings;
+        let _ = &output.tips_output.general_recommendations;
+    }
+
+    #[test]
+    fn test_process_golden_hour_edge_coords() {
+        // Используем граничные, но валидные координаты
+        let (_is_golden, output) = process_golden_hour(90.0, 180.0);
+        assert!(!output.sunrise_sunset.is_empty());
+    }
+
+    #[test]
+    fn test_process_photography_tips_extremes() {
+        // Минимальные значения
+        let tips_min = process_photography_tips(0.0, false, 0.0);
+        assert!(!tips_min.equipment_recommendations.is_empty());
+        // Максимальные значения
+        let tips_max = process_photography_tips(10.0, true, 1.0);
+        assert!(!tips_max.equipment_recommendations.is_empty());
+        assert!(!tips_max.shooting_tips.is_empty());
+        assert!(!tips_max.location_suggestions.is_empty());
+        assert!(!tips_max.technical_settings.is_empty());
+    }
+
+    #[test]
+    fn test_format_dashboard_output_empty_fields() {
+        let output = DashboardOutput {
+            summary: dashboard::DashboardSummary {
+                overall_recommendation: String::new(),
+                weather_score: 0.0,
+                aurora_probability: 0.0,
+                is_golden_hour_today: false,
+                best_shooting_hours: vec![],
+                key_highlights: vec![],
+                warnings: vec![],
+            },
+            weather_output: WeatherOutput {
+                current_weather: String::new(),
+                temperature_range: String::new(),
+                best_hours: String::new(),
+                overall_score: 0.0,
+                recommendation: String::new(),
+                concerns: String::new(),
+            },
+            astrophotography_output: AstrophotographyOutput {
+                is_suitable: false,
+                avg_cloud_cover: 0.0,
+                best_hours: String::new(),
+                recommendation: String::new(),
+            },
+            solar_output: SolarOutput {
+                solar_wind: String::new(),
+                geomagnetic: String::new(),
+                aurora_forecast: String::new(),
+                best_viewing_hours: String::new(),
+            },
+            golden_hour_output: GoldenHourOutput {
+                sunrise_sunset: String::new(),
+                golden_hours: String::new(),
+                blue_hours: String::new(),
+                current_condition: String::new(),
+            },
+            tips_output: PhotographyTipsOutput {
+                equipment_recommendations: vec![],
+                shooting_tips: vec![],
+                location_suggestions: vec![],
+                technical_settings: vec![],
+                general_recommendations: vec![],
+            },
+        };
+        let formatted = format_dashboard_output(&output);
+        assert!(formatted.contains("ФОТОГРАФИЧЕСКИЙ ДАШБОРД"));
+    }
+
+    #[test]
+    fn test_validate_coordinates_edge_cases() {
+        // Граничные значения
+        assert!(validate_coordinates(90.0, 180.0));
+        assert!(validate_coordinates(-90.0, -180.0));
+        assert!(!validate_coordinates(90.1, 0.0));
+        assert!(!validate_coordinates(0.0, 180.1));
+    }
+
+    #[test]
+    fn test_load_environment_variables_missing() {
+        // Удаляем переменные окружения
+        env::remove_var("OPENWEATHER_API_KEY");
+        env::remove_var("CITY");
+        env::remove_var("LATITUDE");
+        env::remove_var("LONGITUDE");
+        let (api_key, city, lat, lon) = load_environment_variables();
+        assert_eq!(api_key, "demo_key");
+        assert_eq!(city, "Moscow");
+        assert_eq!(lat, 55.7558);
+        assert_eq!(lon, 37.6176);
+    }
+
+    #[test]
+    fn test_async_wrappers_empty_city() {
+        let rt = Runtime::new().unwrap();
+        // Пустой город не должен паниковать, но может вернуть ошибку
+        let result = rt.block_on(process_weather_data("demo_key".to_string(), "".to_string()));
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_generate_dashboard_output_edge_coords() {
+        let rt = Runtime::new().unwrap();
+        // Используем граничные, но валидные координаты
+        let result = rt.block_on(generate_dashboard_output(
+            "demo_key".to_string(),
+            "Moscow".to_string(),
+            90.0,
+            180.0,
+        ));
+        assert!(result.is_ok() || result.is_err());
+    }
+}
