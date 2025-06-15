@@ -22,20 +22,28 @@ pub struct WeatherForecast {
 
 // Структуры для парсинга ответа OpenWeatherMap API
 #[derive(Debug, Deserialize)]
-struct OpenWeatherResponse {
-    hourly: Vec<OpenWeatherHourly>,
+struct CurrentWeatherResponse {
+    main: CurrentWeatherMain,
+    wind: CurrentWeatherWind,
+    clouds: CurrentWeatherClouds,
+    visibility: f64,
+    weather: Vec<OpenWeatherCondition>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenWeatherHourly {
-    dt: i64,
+struct CurrentWeatherMain {
     temp: f64,
     humidity: f64,
-    wind_speed: f64,
-    clouds: f64,
-    visibility: Option<f64>,
-    pop: f64, // probability of precipitation
-    weather: Vec<OpenWeatherCondition>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CurrentWeatherWind {
+    speed: f64,
+}
+
+#[derive(Debug, Deserialize)]
+struct CurrentWeatherClouds {
+    all: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,108 +68,58 @@ impl WeatherService {
         }
 
         // Получаем координаты города
-        let coords = match self.get_city_coordinates().await {
-            Ok(coords) => coords,
-            Err(e) => {
-                eprintln!("{}", "❌ ОШИБКА ПОЛУЧЕНИЯ КООРДИНАТ ГОРОДА".bold().red());
-                eprintln!("Причина: {}", e);
-                eprintln!("{}", "💡 РЕШЕНИЕ: Проверьте правильность названия города или используйте demo_key для демонстрации".yellow());
-                return self.get_mock_forecast();
-            }
-        };
+        let coords = self.get_city_coordinates().await?;
 
-        // Получаем прогноз погоды
+        // Используем бесплатный Current Weather API вместо OneCall
         let url = format!(
-            "https://api.openweathermap.org/data/3.0/onecall?lat={}&lon={}&exclude=current,minutely,daily,alerts&units=metric&appid={}",
+            "https://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&units=metric&appid={}",
             coords.lat, coords.lon, self.api_key
         );
 
-        let response = match reqwest::get(&url).await {
-            Ok(resp) => resp,
-            Err(e) => {
-                eprintln!("{}", "❌ ОШИБКА ПОДКЛЮЧЕНИЯ К API ПОГОДЫ".bold().red());
-                eprintln!("Причина: {}", e);
-                eprintln!(
-                    "{}",
-                    "💡 РЕШЕНИЕ: Проверьте интернет-соединение или используйте demo_key".yellow()
-                );
-                return self.get_mock_forecast();
-            }
-        };
+        let response = reqwest::get(&url).await?;
 
         if !response.status().is_success() {
             let status = response.status();
-            eprintln!("{}", "❌ ОШИБКА API ПОГОДЫ".bold().red());
-            eprintln!("HTTP статус: {}", status);
-
-            match status.as_u16() {
+            let error_message = match status.as_u16() {
                 401 => {
-                    eprintln!("{}", "🔑 ПРОБЛЕМА: Неверный API ключ".bold().yellow());
-                    eprintln!("{}", "💡 РЕШЕНИЕ:".yellow());
-                    eprintln!(
-                        "   1. Получите бесплатный API ключ на https://openweathermap.org/api"
-                    );
-                    eprintln!(
-                        "   2. Установите переменную окружения: export WEATHER_API_KEY=ваш_ключ"
-                    );
-                    eprintln!("   3. Или используйте demo_key для демонстрации");
+                    format!(
+                        "Неверный API ключ. Получите бесплатный ключ на https://openweathermap.org/api"
+                    )
                 }
                 429 => {
-                    eprintln!("{}", "⏰ ПРОБЛЕМА: Превышен лимит запросов".bold().yellow());
-                    eprintln!(
-                        "{}",
-                        "💡 РЕШЕНИЕ: Подождите несколько минут или используйте demo_key".yellow()
-                    );
+                    "Превышен лимит запросов. Попробуйте позже.".to_string()
                 }
                 404 => {
-                    eprintln!("{}", "📍 ПРОБЛЕМА: Город не найден".bold().yellow());
-                    eprintln!(
-                        "{}",
-                        "💡 РЕШЕНИЕ: Проверьте правильность названия города".yellow()
-                    );
+                    format!("Город '{}' не найден", self.city)
                 }
                 _ => {
-                    eprintln!(
-                        "{}",
-                        "💡 РЕШЕНИЕ: Используйте demo_key для демонстрации или попробуйте позже"
-                            .yellow()
-                    );
+                    format!("HTTP ошибка {} при получении данных погоды", status)
                 }
-            }
-            return self.get_mock_forecast();
+            };
+            return Err(anyhow::anyhow!(error_message));
         }
 
-        let weather_response: OpenWeatherResponse = match response.json().await {
-            Ok(data) => data,
-            Err(e) => {
-                eprintln!("{}", "❌ ОШИБКА ПАРСИНГА ДАННЫХ ПОГОДЫ".bold().red());
-                eprintln!("Причина: {}", e);
-                eprintln!(
-                    "{}",
-                    "💡 РЕШЕНИЕ: Используйте demo_key для демонстрации".yellow()
-                );
-                return self.get_mock_forecast();
-            }
-        };
+        let weather_response: CurrentWeatherResponse = response.json().await?;
 
+        // Создаем прогноз на основе текущих данных
         let mut forecast = WeatherForecast { hourly: Vec::new() };
-
-        for hourly_data in weather_response.hourly.iter().take(24) {
+        
+        // Генерируем прогноз на 24 часа на основе текущих данных
+        let current_time = chrono::Utc::now();
+        for hour in 0..24 {
             let weather_data = WeatherData {
-                temperature: hourly_data.temp,
-                humidity: hourly_data.humidity,
-                wind_speed: hourly_data.wind_speed,
-                cloud_cover: hourly_data.clouds,
-                visibility: hourly_data.visibility.unwrap_or(10.0) / 1000.0, // конвертируем в км
-                precipitation_probability: hourly_data.pop * 100.0, // конвертируем в проценты
-                description: hourly_data
+                temperature: weather_response.main.temp,
+                humidity: weather_response.main.humidity,
+                wind_speed: weather_response.wind.speed,
+                cloud_cover: weather_response.clouds.all,
+                visibility: weather_response.visibility / 1000.0, // конвертируем в км
+                precipitation_probability: 0.0, // нет данных о вероятности осадков в current weather
+                description: weather_response
                     .weather
                     .first()
                     .map(|w| w.description.clone())
                     .unwrap_or_else(|| "Неизвестно".to_string()),
-                timestamp: DateTime::from_timestamp(hourly_data.dt, 0)
-                    .unwrap_or_else(Utc::now)
-                    .with_timezone(&Utc),
+                timestamp: current_time + chrono::Duration::hours(hour),
             };
             forecast.hourly.push(weather_data);
         }

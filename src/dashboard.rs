@@ -1,5 +1,4 @@
 use crate::golden_hour::{GoldenHourInfo, GoldenHourService};
-use crate::photography_tips::PhotographyTipsService;
 use crate::solar::{AuroraForecast, SolarService};
 use crate::weather::{analyze_weather_for_photography, WeatherAnalysis, WeatherService};
 use chrono::{DateTime, Local, Timelike};
@@ -20,7 +19,6 @@ pub struct PhotographyDashboard {
     weather_service: WeatherService,
     solar_service: SolarService,
     golden_hour_service: GoldenHourService,
-    tips_service: PhotographyTipsService,
 }
 
 impl PhotographyDashboard {
@@ -29,7 +27,6 @@ impl PhotographyDashboard {
             weather_service: WeatherService::new(api_key, city),
             solar_service: SolarService::new(),
             golden_hour_service: GoldenHourService::new(latitude, longitude),
-            tips_service: PhotographyTipsService::new(),
         }
     }
 

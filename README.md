@@ -26,6 +26,35 @@ cd my_dashboard
 cargo build --release
 ```
 
+### Настройка API ключа (ВАЖНО!)
+Для получения данных о погоде вам нужен API ключ от OpenWeatherMap:
+
+1. **Получите бесплатный API ключ:**
+   - Зарегистрируйтесь на [OpenWeatherMap](https://openweathermap.org/api)
+   - Перейдите в раздел "API keys"
+   - Скопируйте ваш ключ
+
+2. **Настройте ключ одним из способов:**
+   ```bash
+   # Способ 1: Переменная окружения
+   export WEATHER_API_KEY="your_api_key"
+   
+   # Способ 2: Файл .env (рекомендуется)
+   cp env.example .env
+   # Отредактируйте .env файл, заменив your_api_key_here на ваш ключ
+   
+   # Способ 3: Параметр скрипта
+   ./run.sh "Москва" 55.7558 37.6176 "your_api_key"
+   ```
+
+3. **Проверьте работу ключа:**
+   ```bash
+   # Тест API ключа
+   curl "https://api.openweathermap.org/data/2.5/weather?q=Moscow&units=metric&appid=YOUR_API_KEY"
+   ```
+
+**Примечание:** Приложение использует бесплатный Current Weather API, который работает с любым API ключом OpenWeatherMap.
+
 ### Запуск
 ```bash
 # Простой запуск
