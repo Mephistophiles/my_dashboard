@@ -10,22 +10,32 @@ echo "=================================="
 CITY=${1:-"Москва"}
 LATITUDE=${2:-"55.7558"}
 LONGITUDE=${3:-"37.6176"}
-WEATHER_API_KEY=${4:-"demo_key"}
+OPENWEATHER_API_KEY=${4:-"demo_key"}
 
 echo "📍 Локация: $CITY ($LATITUDE, $LONGITUDE)"
-echo "🔑 API ключ: ${WEATHER_API_KEY:0:8}..." # Показываем только первые 8 символов для безопасности
+echo "🔑 API ключ: ${OPENWEATHER_API_KEY:0:8}..." # Показываем только первые 8 символов для безопасности
+
+# Проверяем DEMO режим
+if [ "$OPENWEATHER_API_KEY" = "demo_key" ] || [ "$DEMO_MODE" = "true" ]; then
+    echo "🎭 DEMO режим: используются демонстрационные данные"
+    export DEMO_MODE=true
+else
+    echo "🌐 Production режим: используются реальные данные API"
+    export DEMO_MODE=false
+fi
+
 echo ""
 
 # Проверяем, есть ли API ключ в переменных окружения
-if [ -z "$4" ] && [ -n "$WEATHER_API_KEY" ]; then
-    echo "ℹ️  Используется API ключ из переменной окружения WEATHER_API_KEY"
+if [ -z "$4" ] && [ -n "$OPENWEATHER_API_KEY" ]; then
+    echo "ℹ️  Используется API ключ из переменной окружения OPENWEATHER_API_KEY"
 fi
 
 # Установка переменных окружения
 export CITY="$CITY"
 export LATITUDE="$LATITUDE"
 export LONGITUDE="$LONGITUDE"
-export WEATHER_API_KEY="$WEATHER_API_KEY"
+export OPENWEATHER_API_KEY="$OPENWEATHER_API_KEY"
 
 # Проверяем, что Cargo установлен
 if ! command -v cargo &> /dev/null; then

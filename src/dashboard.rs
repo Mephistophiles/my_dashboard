@@ -119,10 +119,8 @@ impl PhotographyDashboard {
         }
 
         // Определяем общую рекомендацию
-        let overall_recommendation = self.determine_overall_recommendation(
-            weather_analysis.overall_score,
-            is_golden_hour_today,
-        );
+        let overall_recommendation = self
+            .determine_overall_recommendation(weather_analysis.overall_score, is_golden_hour_today);
 
         // Используем лучшие часы для съемки из погодного анализа
         let best_shooting_hours = weather_analysis.best_hours.clone();
@@ -158,14 +156,21 @@ impl PhotographyDashboard {
         println!("\n{}", "=== ФОТОГРАФИЧЕСКИЙ ДАШБОРД ===".bold().white());
         println!("{}", "📊 ОБЩАЯ ОЦЕНКА".bold().cyan());
         println!("   Погода: {:.1}/10", summary.weather_score);
-        println!("   Золотой час: {}", if summary.is_golden_hour_today { "Да" } else { "Нет" });
-        
+        println!(
+            "   Золотой час: {}",
+            if summary.is_golden_hour_today {
+                "Да"
+            } else {
+                "Нет"
+            }
+        );
+
         if !summary.best_shooting_hours.is_empty() {
             // Сжимаем часы до интервалов
             let mut intervals = Vec::new();
             let mut start = summary.best_shooting_hours[0];
             let mut end = start;
-            
+
             for &hour in &summary.best_shooting_hours[1..] {
                 if hour == end + 1 {
                     end = hour;
@@ -185,7 +190,7 @@ impl PhotographyDashboard {
             } else {
                 intervals.push(format!("{:02}:00-{:02}:00", start, end));
             }
-            
+
             println!("   Лучшие часы: {}", intervals.join(", "));
         }
 

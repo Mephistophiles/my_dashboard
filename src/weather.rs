@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::{DateTime, Utc, Timelike};
+use chrono::{DateTime, Timelike, Utc};
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 
@@ -54,26 +54,45 @@ struct OpenWeatherCondition {
 pub struct WeatherService {
     api_key: String,
     city: String,
+    demo_mode: bool,
 }
 
 impl WeatherService {
     pub fn new(api_key: String, city: String) -> Self {
         debug!("Создание WeatherService для города: {}", city);
-        Self { api_key, city }
+
+        // Проверяем DEMO режим
+        let demo_mode = std::env::var("DEMO_MODE")
+            .unwrap_or_else(|_| "false".to_string())
+            .to_lowercase()
+            == "true";
+
+        if demo_mode {
+            warn!("Включен DEMO режим - используются демонстрационные данные");
+        }
+
+        Self {
+            api_key,
+            city,
+            demo_mode,
+        }
     }
 
     pub async fn get_weather_forecast(&self) -> Result<WeatherForecast> {
         debug!("Запрос прогноза погоды для города: {}", self.city);
-        
-        // Если используется demo_key, возвращаем моковые данные
-        if self.api_key == "demo_key" {
+
+        // Если включен DEMO режим или используется demo_key, возвращаем моковые данные
+        if self.demo_mode || self.api_key == "demo_key" {
             warn!("Используются демонстрационные данные погоды");
             return self.get_mock_forecast();
         }
 
         // Получаем координаты города
         let coords = self.get_city_coordinates().await?;
-        debug!("Координаты города {}: lat={}, lon={}", self.city, coords.lat, coords.lon);
+        debug!(
+            "Координаты города {}: lat={}, lon={}",
+            self.city, coords.lat, coords.lon
+        );
 
         // Используем бесплатный Current Weather API вместо OneCall
         let url = format!(
@@ -104,18 +123,20 @@ impl WeatherService {
         }
 
         let weather_response: CurrentWeatherResponse = response.json().await?;
-        info!("Получены данные погоды: {}°C, облачность {}%", 
-              weather_response.main.temp, weather_response.clouds.all);
+        info!(
+            "Получены данные погоды: {}°C, облачность {}%",
+            weather_response.main.temp, weather_response.clouds.all
+        );
 
-        // Создаем прогноз на основе текущих данных с реалистичными вариациями
+        // Создаем прогноз на основе текущих данных БЕЗ случайных вариаций
         let mut forecast = WeatherForecast { hourly: Vec::new() };
 
-        // Генерируем прогноз на 24 часа с реалистичными вариациями
+        // Генерируем прогноз на 24 часа с реалистичными суточными циклами
         let current_time = chrono::Utc::now();
         let base_temp = weather_response.main.temp;
-        
+
         for hour in 0..24 {
-            // Создаем реалистичные вариации температуры в течение дня
+            // Создаем реалистичные суточные вариации температуры БЕЗ случайности
             let hour_of_day = (current_time.hour() + hour as u32) % 24;
             let temp_variation = match hour_of_day {
                 6..=8 => -2.0,   // Утро прохладнее
@@ -125,21 +146,39 @@ impl WeatherService {
                 20..=22 => -2.0, // Поздний вечер
                 _ => -3.0,       // Ночь холоднее
             };
-            
-            let temperature = base_temp + temp_variation + (rand::thread_rng().gen::<f64>() - 0.5) * 2.0;
-            
-            // Вариации других параметров
-            let humidity_variation = (rand::thread_rng().gen::<f64>() - 0.5) * 10.0;
-            let wind_variation = (rand::thread_rng().gen::<f64>() - 0.5) * 2.0;
-            let cloud_variation = (rand::thread_rng().gen::<f64>() - 0.5) * 10.0;
-            
+
+            let temperature = base_temp + temp_variation;
+
+            // Суточные вариации других параметров БЕЗ случайности
+            let humidity_variation = match hour_of_day {
+                6..=8 => -5.0,   // Утро - меньше влажности
+                12..=16 => 5.0,  // День - больше влажности
+                20..=22 => -3.0, // Вечер
+                _ => 0.0,
+            };
+
+            let wind_variation = match hour_of_day {
+                12..=16 => 1.0, // День - ветер сильнее
+                _ => 0.0,
+            };
+
+            let cloud_variation = match hour_of_day {
+                6..=8 => -10.0, // Утро - меньше облаков
+                12..=16 => 5.0, // День - больше облаков
+                _ => 0.0,
+            };
+
             let weather_data = WeatherData {
-                temperature: temperature.max(-20.0).min(50.0), // Ограничиваем разумными пределами
-                humidity: (weather_response.main.humidity + humidity_variation).max(0.0).min(100.0),
+                temperature: temperature.clamp(-20.0, 50.0), // Ограничиваем разумными пределами
+                humidity: (weather_response.main.humidity + humidity_variation).clamp(0.0, 100.0),
                 wind_speed: (weather_response.wind.speed + wind_variation).max(0.0),
-                cloud_cover: (weather_response.clouds.all + cloud_variation).max(0.0).min(100.0),
+                cloud_cover: (weather_response.clouds.all + cloud_variation).clamp(0.0, 100.0),
                 visibility: weather_response.visibility / 1000.0, // конвертируем в км
-                precipitation_probability: if weather_response.clouds.all > 70.0 { 20.0 } else { 5.0 },
+                precipitation_probability: if weather_response.clouds.all > 70.0 {
+                    20.0
+                } else {
+                    5.0
+                },
                 description: weather_response
                     .weather
                     .first()
@@ -150,7 +189,7 @@ impl WeatherService {
             forecast.hourly.push(weather_data);
         }
 
-        debug!("Сгенерирован прогноз на 24 часа с вариациями температуры");
+        debug!("Сгенерирован прогноз на 24 часа с суточными циклами");
         Ok(forecast)
     }
 
@@ -181,7 +220,7 @@ impl WeatherService {
     }
 
     fn get_mock_forecast(&self) -> Result<WeatherForecast> {
-        // Моковые данные для демонстрации
+        // Моковые данные для демонстрации (только в DEMO режиме)
         let mut forecast = WeatherForecast { hourly: Vec::new() };
 
         for hour in 0..24 {
@@ -425,7 +464,7 @@ pub fn print_weather_analysis(forecast: &WeatherForecast) {
             current_weather.description
         );
     }
-    
+
     let min_temp = forecast
         .hourly
         .iter()
@@ -446,7 +485,7 @@ pub fn print_weather_analysis(forecast: &WeatherForecast) {
         .iter()
         .map(|w| w.wind_speed)
         .fold(0.0, f64::max);
-    
+
     print!(
         "📊 Диапазон: 🌡️{}-{}°C  💨Ветер до {:.1}м/с  🌧️Осадки до {:.0}%  ",
         min_temp as i32, max_temp as i32, max_wind, max_precip
@@ -454,7 +493,7 @@ pub fn print_weather_analysis(forecast: &WeatherForecast) {
 
     // Анализируем погоду для фотографии
     let analysis = analyze_weather_for_photography(forecast);
-    
+
     // Сжимаем лучшие часы до интервалов
     if !analysis.best_hours.is_empty() {
         print!("🕐 Лучшие часы: ");
@@ -513,7 +552,7 @@ pub fn print_astrophotography_analysis(forecast: &WeatherForecast) {
     let analysis = analyze_astrophotography_conditions(forecast);
     let avg_cloud_cover =
         forecast.hourly.iter().map(|w| w.cloud_cover).sum::<f64>() / forecast.hourly.len() as f64;
-    
+
     print!(
         "🌌 Астрофото: {} | ☁️{:.0}% | ",
         if analysis.is_suitable { "✅" } else { "❌" },

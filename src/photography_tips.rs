@@ -1,5 +1,3 @@
-use colored::*;
-
 #[derive(Debug)]
 pub struct PhotographyTips {
     pub equipment_recommendations: Vec<String>,
@@ -128,7 +126,7 @@ impl PhotographyTipsService {
     }
 }
 
-pub fn print_photography_tips(tips: &Vec<String>) {
+pub fn print_photography_tips(tips: &[String]) {
     for (i, tip) in tips.iter().enumerate() {
         println!("{}. {}", i + 1, tip);
     }

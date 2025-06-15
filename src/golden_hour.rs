@@ -80,6 +80,16 @@ impl GoldenHourService {
         }
     }
 
+    pub fn is_golden_hour(&self) -> bool {
+        let current_time = chrono::Local::now();
+        let golden_hours = self.calculate_golden_hours(current_time);
+
+        (current_time >= golden_hours.golden_hour_morning_start
+            && current_time <= golden_hours.golden_hour_morning_end)
+            || (current_time >= golden_hours.golden_hour_evening_start
+                && current_time <= golden_hours.golden_hour_evening_end)
+    }
+
     #[allow(dead_code)]
     pub fn get_current_lighting_condition(&self, current_time: DateTime<Local>) -> String {
         let golden_hours = self.calculate_golden_hours(current_time);
@@ -111,7 +121,7 @@ impl GoldenHourService {
 pub fn print_golden_hour_info(service: &GoldenHourService) {
     let current_time = chrono::Local::now();
     let info = service.calculate_golden_hours(current_time);
-    
+
     println!(
         "🌅 Золотой час утро: {}-{} | 🌆 Золотой час вечер: {}-{} | 🌅 Синий час утро: {}-{} | 🌆 Синий час вечер: {}-{}",
         info.golden_hour_morning_start.format("%H:%M"),

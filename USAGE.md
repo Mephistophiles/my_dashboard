@@ -27,7 +27,7 @@
 
 ### Способ 1: Переменная окружения
 ```bash
-export WEATHER_API_KEY="your_api_key_here"
+export OPENWEATHER_API_KEY="your_api_key_here"
 ./run.sh
 ```
 
@@ -39,11 +39,27 @@ export WEATHER_API_KEY="your_api_key_here"
 ### Способ 3: Файл .env (рекомендуется)
 ```bash
 # Создайте файл .env в корне проекта
-echo "WEATHER_API_KEY=your_api_key_here" > .env
+echo "OPENWEATHER_API_KEY=your_api_key_here" > .env
 echo "CITY=Москва" >> .env
 echo "LATITUDE=55.7558" >> .env
 echo "LONGITUDE=37.6176" >> .env
 ```
+
+## 🎭 DEMO режим
+
+Для тестирования и демонстрации можно использовать DEMO режим:
+
+```bash
+# Включить DEMO режим
+export DEMO_MODE=true
+./run.sh
+
+# Или через .env файл
+echo "DEMO_MODE=true" >> .env
+./run.sh
+```
+
+**Важно:** В DEMO режиме используются демонстрационные данные. Для получения реальных данных о погоде используйте настоящий API ключ OpenWeatherMap.
 
 ## 📍 Популярные города
 
@@ -180,10 +196,10 @@ chmod +x run.sh
 ### Ошибка API ключа
 ```bash
 # Проверьте, что API ключ корректный
-echo $WEATHER_API_KEY
+echo $OPENWEATHER_API_KEY
 
 # Или установите новый
-export WEATHER_API_KEY="your_new_api_key"
+export OPENWEATHER_API_KEY="your_new_api_key"
 ```
 
 ## 📊 Интерпретация результатов

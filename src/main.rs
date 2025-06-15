@@ -59,11 +59,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(e) => {
             error!("Ошибка генерации дашборда: {}", e);
-            return Err(e.into());
+            return Err(e);
         }
     }
 
     println!("\n{}", "📊 ДЕТАЛЬНАЯ ИНФОРМАЦИЯ".bold().cyan());
+
+    // Переменные для хранения данных о погоде и золотом часе
+    let mut weather_score = 0.0;
+    let aurora_probability = 0.0;
 
     // Погода
     let weather_service = WeatherService::new(api_key, city);
@@ -71,6 +75,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(forecast) => {
             debug!("Получен прогноз погоды: {} записей", forecast.hourly.len());
             print_weather_analysis(&forecast);
+            
+            // Получаем оценку погоды для советов
+            let analysis = weather::analyze_weather_for_photography(&forecast);
+            weather_score = analysis.overall_score;
             
             // Астрофотография
             print_astrophotography_analysis(&forecast);
@@ -93,20 +101,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Золотой час
     let golden_hour_service = GoldenHourService::new(latitude, longitude);
     print_golden_hour_info(&golden_hour_service);
+    
+    // Проверяем, сейчас ли золотой час
+    let is_golden_hour = golden_hour_service.is_golden_hour();
 
     println!("\n{}", "=== СОВЕТЫ ДЛЯ ФОТОГРАФОВ ===".bold().green());
 
-    // Советы по фотографии
+    // Советы по фотографии с учетом реальных данных
     let tips_service = PhotographyTipsService::new();
-    let tips = tips_service.get_general_recommendations();
-    print_photography_tips(&tips);
+    let personalized_tips = tips_service.get_tips_for_weather(
+        weather_score,
+        is_golden_hour,
+        aurora_probability,
+    );
 
+    // Выводим персонализированные советы
+    if !personalized_tips.equipment_recommendations.is_empty() {
+        println!("\n📷 РЕКОМЕНДАЦИИ ПО ОБОРУДОВАНИЮ:");
+        print_photography_tips(&personalized_tips.equipment_recommendations);
+    }
+
+    if !personalized_tips.shooting_tips.is_empty() {
+        println!("\n🎯 СОВЕТЫ ПО СЪЕМКЕ:");
+        print_photography_tips(&personalized_tips.shooting_tips);
+    }
+
+    if !personalized_tips.location_suggestions.is_empty() {
+        println!("\n📍 РЕКОМЕНДАЦИИ ПО ЛОКАЦИЯМ:");
+        print_photography_tips(&personalized_tips.location_suggestions);
+    }
+
+    if !personalized_tips.technical_settings.is_empty() {
+        println!("\n⚙️ ТЕХНИЧЕСКИЕ НАСТРОЙКИ:");
+        print_photography_tips(&personalized_tips.technical_settings);
+    }
+
+    // Общие рекомендации
     println!("\n{}", "=== ОБЩИЕ РЕКОМЕНДАЦИИ ===".bold().blue());
-    println!("  1. Всегда проверяйте прогноз погоды перед съемкой");
-    println!("  2. Планируйте локации заранее");
-    println!("  3. Берите запасные батареи и карты памяти");
-    println!("  4. Изучите правила съемки в выбранных местах");
-    println!("  5. Не забудьте о безопасности - особенно при съемке в дикой природе");
+    let general_tips = tips_service.get_general_recommendations();
+    print_photography_tips(&general_tips);
 
     info!("Дашборд завершен успешно");
     Ok(())
