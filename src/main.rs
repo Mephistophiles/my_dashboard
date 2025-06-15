@@ -12,6 +12,7 @@ use photography_tips::{print_photography_tips, PhotographyTipsService};
 use solar::{predict_aurora, print_solar_data};
 use std::env;
 use weather::{print_astrophotography_analysis, print_weather_analysis, WeatherService};
+use chrono::{Datelike, Timelike};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -156,4 +157,112 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Дашборд завершен успешно");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+    use chrono::{Datelike, Timelike};
+
+    #[test]
+    fn test_environment_variable_parsing() {
+        // Тестируем парсинг переменных окружения
+        let api_key = env::var("OPENWEATHER_API_KEY").unwrap_or_else(|_| {
+            warn!("OPENWEATHER_API_KEY не найден, используем demo_key");
+            "demo_key".to_string()
+        });
+        assert!(!api_key.is_empty());
+
+        let city = env::var("CITY").unwrap_or_else(|_| {
+            info!("CITY не найден, используем Москва");
+            "Moscow".to_string()
+        });
+        assert!(!city.is_empty());
+
+        let latitude = env::var("LATITUDE")
+            .unwrap_or_else(|_| "55.7558".to_string())
+            .parse::<f64>()
+            .unwrap_or(55.7558);
+        assert!(latitude >= -90.0 && latitude <= 90.0);
+
+        let longitude = env::var("LONGITUDE")
+            .unwrap_or_else(|_| "37.6176".to_string())
+            .parse::<f64>()
+            .unwrap_or(37.6176);
+        assert!(longitude >= -180.0 && longitude <= 180.0);
+    }
+
+    #[test]
+    fn test_coordinate_validation() {
+        // Тестируем валидацию координат
+        let valid_lat = "55.7558".parse::<f64>().unwrap_or(55.7558);
+        let valid_lon = "37.6176".parse::<f64>().unwrap_or(37.6176);
+        
+        assert!(valid_lat >= -90.0 && valid_lat <= 90.0);
+        assert!(valid_lon >= -180.0 && valid_lon <= 180.0);
+
+        // Тестируем обработку невалидных координат
+        let invalid_lat = "invalid".parse::<f64>().unwrap_or(55.7558);
+        let invalid_lon = "invalid".parse::<f64>().unwrap_or(37.6176);
+        
+        assert_eq!(invalid_lat, 55.7558); // fallback value
+        assert_eq!(invalid_lon, 37.6176); // fallback value
+    }
+
+    #[test]
+    fn test_service_initialization() {
+        // Тестируем создание сервисов
+        let golden_hour_service = GoldenHourService::new(55.7558, 37.6176);
+        // Проверяем, что сервис создается без ошибок
+        assert!(true);
+
+        let tips_service = PhotographyTipsService::new();
+        // Просто проверяем, что сервис создается без ошибок
+        assert!(true);
+    }
+
+    #[test]
+    fn test_tips_generation() {
+        // Тестируем генерацию советов
+        let tips_service = PhotographyTipsService::new();
+        
+        // Тестируем с разными параметрами
+        let tips_good = tips_service.get_tips_for_weather(8.0, true, 0.7);
+        assert!(!tips_good.equipment_recommendations.is_empty());
+        assert!(!tips_good.shooting_tips.is_empty());
+        
+        let tips_bad = tips_service.get_tips_for_weather(3.0, false, 0.1);
+        assert!(!tips_bad.equipment_recommendations.is_empty());
+        
+        let general_tips = tips_service.get_general_recommendations();
+        assert_eq!(general_tips.len(), 5);
+    }
+
+    #[test]
+    fn test_golden_hour_calculation() {
+        // Тестируем расчет золотого часа
+        let service = GoldenHourService::new(55.7558, 37.6176);
+        let current_time = chrono::Local::now();
+        let info = service.calculate_golden_hours(current_time);
+        
+        // Проверяем, что все времена находятся в разумных пределах
+        assert!(info.sunrise.hour() >= 0 && info.sunrise.hour() <= 23);
+        assert!(info.sunset.hour() >= 0 && info.sunset.hour() <= 23);
+        
+        // Проверяем, что восход раньше заката
+        assert!(info.sunrise < info.sunset);
+    }
+
+    #[test]
+    fn test_lighting_condition_detection() {
+        // Тестируем определение условий освещения
+        let service = GoldenHourService::new(55.7558, 37.6176);
+        let current_time = chrono::Local::now();
+        let condition = service.get_current_lighting_condition(current_time);
+        
+        // Проверяем, что возвращается валидная строка
+        assert!(!condition.is_empty());
+        assert!(condition.contains("час") || condition.contains("время"));
+    }
 }

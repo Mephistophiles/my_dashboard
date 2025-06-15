@@ -146,9 +146,31 @@ let cloud_cover = weather.cloud_cover;
 
 **Требования к коммитам:**
 - Использовать conventional commits (feat:, fix:, docs:, etc.)
-- Подробно описывать изменения в сообщении коммита
+- **ОБЯЗАТЕЛЬНО:** Все коммиты должны быть многострочными с подробным body
+- Subject должен содержать краткое описание изменений
+- Body должен содержать детальное описание всех изменений
 - Группировать связанные изменения в один коммит
 - Тестировать код перед коммитом
+
+**Структура коммита:**
+```
+<type>: <subject>
+
+- <подробное описание изменения 1>
+- <подробное описание изменения 2>
+- <подробное описание изменения 3>
+- <объяснение причин изменений>
+- <технические детали>
+```
+
+**Типы коммитов:**
+- `feat:` - новая функциональность
+- `fix:` - исправление ошибок
+- `docs:` - изменения в документации
+- `style:` - форматирование кода
+- `refactor:` - рефакторинг кода
+- `test:` - добавление или изменение тестов
+- `chore:` - обновление зависимостей, конфигурации
 
 **Пример хорошего коммита:**
 ```
@@ -159,9 +181,93 @@ feat: add debug logging and improve temperature range display
 - Improve emoji usage and full descriptions instead of abbreviations
 - Add proper error handling for API failures
 - Update weather forecast generation with daily temperature cycles
+- Remove hardcoded fallback values in production mode
+- Ensure all API errors are properly propagated to user
 ```
 
-### 10. Документация
+**Плохие примеры коммитов:**
+```
+# Плохо - однострочный коммит без деталей
+fix: bug fixes
+
+# Плохо - нет conventional commit типа
+updated weather module
+
+# Плохо - слишком общее описание
+feat: add new features
+```
+
+### 10. Тестирование
+
+**Обязательные требования к тестам:**
+- **ВСЕ публичные функции должны иметь unit тесты**
+- **ВСЕ модули должны иметь integration тесты**
+- Тесты должны покрывать как успешные сценарии, так и обработку ошибок
+- Mock данные допустимы только в тестах, никогда в production коде
+- Тесты должны быть независимыми и не зависеть от внешних API
+
+**Структура тестов:**
+```
+src/
+├── weather.rs
+├── weather_test.rs      # Unit тесты для weather модуля
+├── solar.rs
+├── solar_test.rs        # Unit тесты для solar модуля
+└── tests/
+    ├── integration_tests.rs  # Integration тесты
+    └── common/              # Общие утилиты для тестов
+```
+
+**Типы тестов:**
+- **Unit тесты:** Тестирование отдельных функций и методов
+- **Integration тесты:** Тестирование взаимодействия между модулями
+- **Mock тесты:** Тестирование с использованием mock данных
+- **Error handling тесты:** Тестирование обработки ошибок
+
+**Примеры тестов:**
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_weather_analysis_calculation() {
+        // Arrange
+        let forecast = create_test_forecast();
+        
+        // Act
+        let analysis = analyze_weather_for_photography(&forecast);
+        
+        // Assert
+        assert!(analysis.overall_score >= 0.0);
+        assert!(analysis.overall_score <= 10.0);
+    }
+
+    #[test]
+    fn test_error_handling_invalid_api_key() {
+        // Arrange
+        let service = WeatherService::new("invalid_key".to_string(), "TestCity".to_string());
+        
+        // Act & Assert
+        let result = service.get_weather_forecast().await;
+        assert!(result.is_err());
+    }
+}
+```
+
+**Требования к покрытию тестами:**
+- Минимум 80% покрытия кода тестами
+- 100% покрытие критических функций (API вызовы, расчеты)
+- Тестирование всех веток условных операторов
+- Тестирование граничных значений
+
+**Mock и тестовые данные:**
+- Создавать отдельные модули для тестовых данных
+- Использовать `#[cfg(test)]` для тестового кода
+- Не включать тестовые данные в production сборку
+- Создавать реалистичные тестовые сценарии
+
+### 11. Документация
 
 **Обязательная документация:**
 - `docs/calculations.md` - все формулы и алгоритмы
