@@ -8,7 +8,7 @@ use colored::*;
 use dashboard::PhotographyDashboard;
 use golden_hour::{print_golden_hour_info, GoldenHourService};
 use photography_tips::{print_photography_tips, PhotographyTipsService};
-use solar::{print_aurora_forecast, SolarService};
+use solar::print_solar_data;
 use std::env;
 use weather::{
     analyze_astrophotography_conditions, analyze_weather_for_photography,
@@ -78,39 +78,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let astrophotography_analysis = analyze_astrophotography_conditions(&weather_forecast);
     print_astrophotography_analysis(&astrophotography_analysis, &weather_forecast);
 
-    // Северные сияния
-    let solar_service = SolarService::new();
-    let solar_wind_data = match solar_service.get_solar_wind_data().await {
-        Ok(data) => data,
-        Err(e) => {
-            eprintln!(
-                "{}",
-                "❌ ОШИБКА ПОЛУЧЕНИЯ ДАННЫХ СОЛНЕЧНОЙ АКТИВНОСТИ"
-                    .bold()
-                    .red()
-            );
-            eprintln!("Причина: {}", e);
-            eprintln!(
-                "{}",
-                "💡 РЕШЕНИЕ: Используются демонстрационные данные".yellow()
-            );
-            return Err(e.into());
-        }
-    };
-    let geomagnetic_data = match solar_service.get_geomagnetic_data().await {
-        Ok(data) => data,
-        Err(e) => {
-            eprintln!("{}", "❌ ОШИБКА ПОЛУЧЕНИЯ ГЕОМАГНИТНЫХ ДАННЫХ".bold().red());
-            eprintln!("Причина: {}", e);
-            eprintln!(
-                "{}",
-                "💡 РЕШЕНИЕ: Используются демонстрационные данные".yellow()
-            );
-            return Err(e.into());
-        }
-    };
-    let aurora_forecast = solar_service.predict_aurora(&solar_wind_data, &geomagnetic_data);
-    print_aurora_forecast(&aurora_forecast, &solar_wind_data, &geomagnetic_data);
+    // Северные сияния и солнечные данные
+    if let Err(e) = print_solar_data().await {
+        eprintln!("{}", "❌ ОШИБКА ПОЛУЧЕНИЯ СОЛНЕЧНЫХ ДАННЫХ".bold().red());
+        eprintln!("Причина: {}", e);
+    }
 
     // Золотой час
     let golden_hour_service = GoldenHourService::new(latitude, longitude);
