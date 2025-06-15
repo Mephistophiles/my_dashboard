@@ -1,0 +1,18 @@
+[package]
+name = "my_dashboard"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+scraper = { version = "0.23" }
+reqwest = { version = "0.12", features = [
+    "json",
+    "rustls-tls",
+], default-features = false }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+sunrise = "2.1"
+colored = "2.0"
+anyhow = "1.0"
