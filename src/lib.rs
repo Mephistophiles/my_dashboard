@@ -492,3 +492,163 @@ pub fn load_environment_variables() -> (String, String, f64, f64) {
 pub fn validate_coordinates(latitude: f64, longitude: f64) -> bool {
     (-90.0..=90.0).contains(&latitude) && (-180.0..=180.0).contains(&longitude)
 }
+
+/// Форматирует вывод дашборда в строку для snapshot testing
+pub fn format_dashboard_output(output: &DashboardOutput) -> String {
+    let mut result = String::new();
+
+    // Основная сводка
+    result.push_str("=== ФОТОГРАФИЧЕСКИЙ ДАШБОРД ===\n");
+    result.push_str("📊 ОБЩАЯ ОЦЕНКА\n");
+    result.push_str(&format!(
+        "   Погода: {:.1}/10\n",
+        output.summary.weather_score
+    ));
+    result.push_str(&format!(
+        "   Вероятность северных сияний: {:.0}%\n",
+        output.summary.aurora_probability * 100.0
+    ));
+    result.push_str(&format!(
+        "   Золотой час: {}\n",
+        if output.summary.is_golden_hour_today {
+            "Да"
+        } else {
+            "Нет"
+        }
+    ));
+
+    if !output.summary.best_shooting_hours.is_empty() {
+        result.push_str(&format!(
+            "   Лучшие часы: {}\n",
+            output
+                .summary
+                .best_shooting_hours
+                .iter()
+                .map(|h| format!("{:02}:00", h))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+
+    if !output.summary.key_highlights.is_empty() {
+        result.push_str("✨ КЛЮЧЕВЫЕ МОМЕНТЫ\n");
+        for highlight in &output.summary.key_highlights {
+            result.push_str(&format!("   • {}\n", highlight));
+        }
+    }
+
+    if !output.summary.warnings.is_empty() {
+        result.push_str("⚠️ ПРЕДУПРЕЖДЕНИЯ\n");
+        for warning in &output.summary.warnings {
+            result.push_str(&format!("   • {}\n", warning));
+        }
+    }
+
+    result.push_str("🎯 РЕКОМЕНДАЦИЯ\n");
+    result.push_str(&format!("   {}\n", output.summary.overall_recommendation));
+
+    // Детальная информация
+    result.push_str("\n📊 ДЕТАЛЬНАЯ ИНФОРМАЦИЯ\n");
+    result.push_str(&format!("{}\n", output.weather_output.current_weather));
+    result.push_str(&format!(
+        "{}  {}  | ⭐ Оценка: {:.1}/10\n",
+        output.weather_output.temperature_range,
+        output.weather_output.best_hours,
+        output.weather_output.overall_score
+    ));
+
+    if !output.weather_output.recommendation.is_empty() {
+        result.push_str(&output.weather_output.recommendation);
+    }
+    if !output.weather_output.concerns.is_empty() {
+        result.push_str(&format!(" | {}", output.weather_output.concerns));
+    }
+    result.push('\n');
+
+    // Астрофотография
+    result.push_str(&format!(
+        "🌌 Астрофото: {} | ☁️{:.0}% | ",
+        if output.astrophotography_output.is_suitable {
+            "✅"
+        } else {
+            "❌"
+        },
+        output.astrophotography_output.avg_cloud_cover
+    ));
+
+    if !output.astrophotography_output.best_hours.is_empty() {
+        result.push_str(&format!("{} ", output.astrophotography_output.best_hours));
+    }
+    if !output.astrophotography_output.recommendation.is_empty() {
+        result.push_str(&format!(
+            "| {}",
+            output.astrophotography_output.recommendation
+        ));
+    }
+    result.push('\n');
+
+    // Солнечные данные
+    result.push_str(&format!("{}\n", output.solar_output.solar_wind));
+    result.push_str(&format!("{}\n", output.solar_output.geomagnetic));
+    result.push_str(&format!("{}\n", output.solar_output.aurora_forecast));
+    if !output.solar_output.best_viewing_hours.is_empty() {
+        result.push_str(&format!("   {}\n", output.solar_output.best_viewing_hours));
+    }
+
+    // Золотой час
+    result.push_str(&format!("{}\n", output.golden_hour_output.sunrise_sunset));
+    result.push_str(&format!("{}\n", output.golden_hour_output.golden_hours));
+    result.push_str(&format!("{}\n", output.golden_hour_output.blue_hours));
+    result.push_str(&format!(
+        "💡 Текущие условия освещения: {}\n",
+        output.golden_hour_output.current_condition
+    ));
+
+    // Советы
+    result.push_str("\n=== СОВЕТЫ ДЛЯ ФОТОГРАФОВ ===\n");
+
+    if !output.tips_output.equipment_recommendations.is_empty() {
+        result.push_str("\n📷 РЕКОМЕНДАЦИИ ПО ОБОРУДОВАНИЮ:\n");
+        for (i, tip) in output
+            .tips_output
+            .equipment_recommendations
+            .iter()
+            .enumerate()
+        {
+            result.push_str(&format!("{}. {}\n", i + 1, tip));
+        }
+    }
+
+    if !output.tips_output.shooting_tips.is_empty() {
+        result.push_str("\n🎯 СОВЕТЫ ПО СЪЕМКЕ:\n");
+        for (i, tip) in output.tips_output.shooting_tips.iter().enumerate() {
+            result.push_str(&format!("{}. {}\n", i + 1, tip));
+        }
+    }
+
+    if !output.tips_output.location_suggestions.is_empty() {
+        result.push_str("\n📍 РЕКОМЕНДАЦИИ ПО ЛОКАЦИЯМ:\n");
+        for (i, tip) in output.tips_output.location_suggestions.iter().enumerate() {
+            result.push_str(&format!("{}. {}\n", i + 1, tip));
+        }
+    }
+
+    if !output.tips_output.technical_settings.is_empty() {
+        result.push_str("\n⚙️ ТЕХНИЧЕСКИЕ НАСТРОЙКИ:\n");
+        for (i, tip) in output.tips_output.technical_settings.iter().enumerate() {
+            result.push_str(&format!("{}. {}\n", i + 1, tip));
+        }
+    }
+
+    result.push_str("\n=== ОБЩИЕ РЕКОМЕНДАЦИИ ===\n");
+    for (i, tip) in output
+        .tips_output
+        .general_recommendations
+        .iter()
+        .enumerate()
+    {
+        result.push_str(&format!("{}. {}\n", i + 1, tip));
+    }
+
+    result
+}

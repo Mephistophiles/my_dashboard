@@ -72,7 +72,7 @@ pre-commit: check build
 
 # Release-процедура с параметром версии
 # Использование: just release 0.5.0
-# 
+#
 # ПЕРЕД РЕЛИЗОМ ОБЯЗАТЕЛЬНО:
 # 1. Обновите CHANGELOG.md - переместите изменения из [Unreleased] в новую версию
 # 2. Убедитесь, что все тесты проходят: just test
@@ -83,3 +83,11 @@ release version: pre-commit build-release
     git add .
     git commit -m "release: v{{version}}"
     git tag v{{version}} -m "release: v{{version}}"
+
+# Захват вывода main в DEMO режиме и автоматическое обновление README.md
+capture-demo:
+    cargo run --bin capture_demo_output
+
+# Проверка соответствия вывода main с README.md
+test-readme-snapshot:
+    cargo test test_readme_output_matches_demo --test readme_snapshot_test

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2025-01-27
+
+### Added
+- **Новый релиз 0.4.5** - обновление версии для стабильности и улучшений
+
+### Changed
+- **Обновлена версия в Cargo.toml** - с 0.4.3 до 0.4.5
+- **Обновлен CHANGELOG.md** - добавлена запись о новом релизе
+
 ## [0.4.3] - 2025-06-15
 
 ### Fixed
