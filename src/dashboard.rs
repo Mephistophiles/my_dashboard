@@ -39,7 +39,7 @@ use colored::*;
 use log::info;
 
 /// Сводка условий для фотографии
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DashboardSummary {
     /// Общая рекомендация для съемки
     pub overall_recommendation: String,
@@ -127,7 +127,7 @@ impl PhotographyDashboard {
     /// //     Ok(())
     /// // }
     /// ```
-    pub async fn generate_dashboard(&self) -> Result<DashboardSummary, Box<dyn std::error::Error>> {
+    pub async fn generate_dashboard(&self) -> Result<DashboardSummary, anyhow::Error> {
         let current_time = Local::now();
 
         // Получаем данные о погоде
@@ -143,7 +143,7 @@ impl PhotographyDashboard {
                     "{}",
                     "💡 РЕШЕНИЕ: Проверьте API ключ или используйте demo_key".yellow()
                 );
-                return Err(e.into());
+                return Err(e);
             }
         };
         let weather_analysis = analyze_weather_for_photography(&weather_forecast);
@@ -166,7 +166,7 @@ impl PhotographyDashboard {
                 );
                 eprintln!("Причина: {}", e);
                 eprintln!("{}", "💡 РЕШЕНИЕ: Проверьте интернет-соединение".yellow());
-                return Err(e.into());
+                return Err(e);
             }
         };
 

@@ -487,92 +487,6 @@ pub struct WeatherAnalysis {
     pub concerns: Vec<String>,
 }
 
-pub fn print_weather_analysis(forecast: &WeatherForecast) {
-    if let Some(current_weather) = forecast.hourly.first() {
-        println!(
-            "🌤️ Погода: 🌡️{:.1}°C  ☁️{:.0}%  💨{:.1}м/с  🌧️{:.0}%  📝{}",
-            current_weather.temperature,
-            current_weather.cloud_cover,
-            current_weather.wind_speed,
-            current_weather.precipitation_probability,
-            current_weather.description
-        );
-    }
-
-    let min_temp = forecast
-        .hourly
-        .iter()
-        .map(|w| w.temperature)
-        .fold(f64::INFINITY, f64::min);
-    let max_temp = forecast
-        .hourly
-        .iter()
-        .map(|w| w.temperature)
-        .fold(f64::NEG_INFINITY, f64::max);
-    let max_precip = forecast
-        .hourly
-        .iter()
-        .map(|w| w.precipitation_probability)
-        .fold(0.0, f64::max);
-    let max_wind = forecast
-        .hourly
-        .iter()
-        .map(|w| w.wind_speed)
-        .fold(0.0, f64::max);
-
-    print!(
-        "📊 Диапазон: 🌡️{}-{}°C  💨Ветер до {:.1}м/с  🌧️Осадки до {:.0}%  ",
-        min_temp as i32, max_temp as i32, max_wind, max_precip
-    );
-
-    // Анализируем погоду для фотографии
-    let analysis = analyze_weather_for_photography(forecast);
-
-    // Сжимаем лучшие часы до интервалов
-    if !analysis.best_hours.is_empty() {
-        print!("🕐 Лучшие часы: ");
-        let mut intervals = Vec::new();
-        let mut start = analysis.best_hours[0];
-        let mut end = start;
-
-        for &hour in &analysis.best_hours[1..] {
-            if hour == end + 1 {
-                end = hour;
-            } else {
-                if start == end {
-                    intervals.push(format!("{:02}:00", start));
-                } else {
-                    intervals.push(format!("{:02}:00-{:02}:00", start, end));
-                }
-                start = hour;
-                end = hour;
-            }
-        }
-        // Добавляем последний интервал
-        if start == end {
-            intervals.push(format!("{:02}:00", start));
-        } else {
-            intervals.push(format!("{:02}:00-{:02}:00", start, end));
-        }
-
-        // Показываем только первые 3 интервала
-        for interval in intervals.iter().take(3) {
-            print!("{} ", interval);
-        }
-    }
-
-    println!("| ⭐ Оценка: {:.1}/10", analysis.overall_score);
-
-    if !analysis.recommendations.is_empty() {
-        print!("💡 Рекомендация: {}", analysis.recommendations[0]);
-    }
-
-    if !analysis.concerns.is_empty() {
-        print!(" | ⚠️ Проблемы: {}", analysis.concerns[0]);
-    }
-    println!();
-}
-
 #[derive(Debug)]
 pub struct AstrophotographyAnalysis {
     pub is_suitable: bool,
@@ -580,56 +494,6 @@ pub struct AstrophotographyAnalysis {
     pub recommendations: Vec<String>,
     pub best_hours: Vec<usize>,
     pub concerns: Vec<String>,
-}
-
-pub fn print_astrophotography_analysis(forecast: &WeatherForecast) {
-    let analysis = analyze_astrophotography_conditions(forecast);
-    let avg_cloud_cover =
-        forecast.hourly.iter().map(|w| w.cloud_cover).sum::<f64>() / forecast.hourly.len() as f64;
-
-    print!(
-        "🌌 Астрофото: {} | ☁️{:.0}% | ",
-        if analysis.is_suitable { "✅" } else { "❌" },
-        avg_cloud_cover
-    );
-
-    // Сжимаем лучшие часы до интервалов
-    if !analysis.best_hours.is_empty() {
-        print!("🕐 Лучшие часы: ");
-        let mut intervals = Vec::new();
-        let mut start = analysis.best_hours[0];
-        let mut end = start;
-
-        for &hour in &analysis.best_hours[1..] {
-            if hour == end + 1 {
-                end = hour;
-            } else {
-                if start == end {
-                    intervals.push(format!("{:02}:00", start));
-                } else {
-                    intervals.push(format!("{:02}:00-{:02}:00", start, end));
-                }
-                start = hour;
-                end = hour;
-            }
-        }
-        // Добавляем последний интервал
-        if start == end {
-            intervals.push(format!("{:02}:00", start));
-        } else {
-            intervals.push(format!("{:02}:00-{:02}:00", start, end));
-        }
-
-        // Показываем только первые 2 интервала
-        for interval in intervals.iter().take(2) {
-            print!("{} ", interval);
-        }
-    }
-
-    if !analysis.recommendations.is_empty() {
-        print!("| 💡 {}", analysis.recommendations[0]);
-    }
-    println!();
 }
 
 #[cfg(test)]
@@ -885,9 +749,6 @@ mod tests {
     fn test_astrophotography_analysis_components() {
         let forecast = create_test_forecast();
         let analysis = analyze_astrophotography_conditions(&forecast);
-
-        // Проверяем все компоненты анализа астрофотографии
-        assert!(matches!(analysis.is_suitable, true | false));
 
         // Проверяем, что есть рекомендации
         assert!(!analysis.recommendations.is_empty());

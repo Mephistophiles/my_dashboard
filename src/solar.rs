@@ -50,81 +50,7 @@ struct KpRecord {
     kp_index: f64,
 }
 
-pub async fn print_solar_data() -> Result<()> {
-    match fetch_solar_wind_data().await {
-        Ok(solar_wind) => {
-            println!(
-                "🌞 Солнечный ветер: 💨{:.1}км/с  📊{:.1}частиц/см³  🌡️{:.0}K  🕐{}",
-                solar_wind.speed,
-                solar_wind.density,
-                solar_wind.temperature,
-                solar_wind.timestamp.format("%H:%M")
-            );
-        }
-        Err(e) => {
-            println!("❌ Ошибка получения данных солнечного ветра: {}", e);
-        }
-    }
-
-    match fetch_geomagnetic_data().await {
-        Ok(geomagnetic) => {
-            println!(
-                "🌍 Геомагнитные данные: 🧲Kp {:.1}  🌌Активность сияний {:.1}/10  🕐{}",
-                geomagnetic.kp_index,
-                geomagnetic.aurora_activity,
-                geomagnetic.timestamp.format("%H:%M")
-            );
-        }
-        Err(e) => {
-            println!("❌ Ошибка получения геомагнитных данных: {}", e);
-        }
-    }
-
-    match predict_aurora().await {
-        Ok(forecast) => {
-            println!(
-                "🌌 Прогноз северных сияний: {}%  📊{}  💡{}",
-                (forecast.visibility_probability * 100.0) as i32,
-                forecast.intensity_level,
-                forecast.conditions
-            );
-
-            if !forecast.best_viewing_hours.is_empty() {
-                let mut intervals = Vec::new();
-                let mut start = forecast.best_viewing_hours[0];
-                let mut end = start;
-
-                for &hour in &forecast.best_viewing_hours[1..] {
-                    if hour == end + 1 {
-                        end = hour;
-                    } else {
-                        if start == end {
-                            intervals.push(format!("{:02}:00", start));
-                        } else {
-                            intervals.push(format!("{:02}:00-{:02}:00", start, end));
-                        }
-                        start = hour;
-                        end = hour;
-                    }
-                }
-                if start == end {
-                    intervals.push(format!("{:02}:00", start));
-                } else {
-                    intervals.push(format!("{:02}:00-{:02}:00", start, end));
-                }
-
-                println!("   🕐 Лучшие часы для наблюдения: {}", intervals.join(", "));
-            }
-        }
-        Err(e) => {
-            println!("   ❌ Ошибка прогноза северных сияний: {}", e);
-        }
-    }
-
-    Ok(())
-}
-
-async fn fetch_solar_wind_data() -> Result<SolarWindData> {
+pub async fn fetch_solar_wind_data() -> Result<SolarWindData> {
     let url = "https://services.swpc.noaa.gov/json/ace/swepam/ace_swepam_1h.json";
     let response = reqwest::get(url).await?;
 
@@ -185,7 +111,7 @@ async fn fetch_solar_wind_data() -> Result<SolarWindData> {
     })
 }
 
-async fn fetch_geomagnetic_data() -> Result<GeomagneticData> {
+pub async fn fetch_geomagnetic_data() -> Result<GeomagneticData> {
     let url = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
     let response = reqwest::get(url).await?;
 

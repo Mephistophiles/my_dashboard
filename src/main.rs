@@ -1,123 +1,11 @@
-mod dashboard;
-mod golden_hour;
-mod photography_tips;
-mod solar;
-mod weather;
-
 use colored::*;
-use dashboard::PhotographyDashboard;
-use golden_hour::{print_golden_hour_info, GoldenHourService};
-use log::{debug, error, info, warn};
-use photography_tips::{print_photography_tips, PhotographyTipsService};
-use solar::{predict_aurora, print_solar_data};
-use std::env;
-use weather::{print_astrophotography_analysis, print_weather_analysis, WeatherService};
-
-/// Загружает и валидирует переменные окружения
-fn load_environment_variables() -> (String, String, f64, f64) {
-    let api_key = env::var("OPENWEATHER_API_KEY").unwrap_or_else(|_| {
-        warn!("OPENWEATHER_API_KEY не найден, используем demo_key");
-        "demo_key".to_string()
-    });
-
-    let city = env::var("CITY").unwrap_or_else(|_| {
-        info!("CITY не найден, используем Москва");
-        "Moscow".to_string()
-    });
-
-    let latitude = env::var("LATITUDE")
-        .unwrap_or_else(|_| "55.7558".to_string())
-        .parse::<f64>()
-        .unwrap_or(55.7558);
-
-    let longitude = env::var("LONGITUDE")
-        .unwrap_or_else(|_| "37.6176".to_string())
-        .parse::<f64>()
-        .unwrap_or(37.6176);
-
-    (api_key, city, latitude, longitude)
-}
-
-/// Валидирует координаты
-fn validate_coordinates(latitude: f64, longitude: f64) -> bool {
-    (-90.0..=90.0).contains(&latitude) && (-180.0..=180.0).contains(&longitude)
-}
-
-/// Обрабатывает данные погоды и возвращает оценку
-async fn process_weather_data(
-    api_key: String,
-    city: String,
-) -> Result<f64, Box<dyn std::error::Error>> {
-    let weather_service = WeatherService::new(api_key, city);
-    let forecast = weather_service.get_weather_forecast().await?;
-
-    debug!("Получен прогноз погоды: {} записей", forecast.hourly.len());
-    print_weather_analysis(&forecast);
-
-    let analysis = weather::analyze_weather_for_photography(&forecast);
-    let weather_score = analysis.overall_score;
-
-    print_astrophotography_analysis(&forecast);
-
-    Ok(weather_score)
-}
-
-/// Обрабатывает солнечные данные и возвращает вероятность сияний
-async fn process_solar_data() -> Result<f64, Box<dyn std::error::Error>> {
-    print_solar_data().await?;
-    debug!("Солнечные данные успешно получены");
-
-    let forecast = predict_aurora().await?;
-    let aurora_probability = forecast.visibility_probability;
-
-    debug!(
-        "Получена вероятность северных сияний: {:.0}%",
-        aurora_probability * 100.0
-    );
-
-    Ok(aurora_probability)
-}
-
-/// Обрабатывает золотой час
-fn process_golden_hour(latitude: f64, longitude: f64) -> bool {
-    let golden_hour_service = GoldenHourService::new(latitude, longitude);
-    print_golden_hour_info(&golden_hour_service);
-    golden_hour_service.is_golden_hour()
-}
-
-/// Выводит персонализированные советы
-fn print_personalized_tips(weather_score: f64, is_golden_hour: bool, aurora_probability: f64) {
-    let tips_service = PhotographyTipsService::new();
-    let personalized_tips =
-        tips_service.get_tips_for_weather(weather_score, is_golden_hour, aurora_probability);
-
-    if !personalized_tips.equipment_recommendations.is_empty() {
-        println!("\n📷 РЕКОМЕНДАЦИИ ПО ОБОРУДОВАНИЮ:");
-        print_photography_tips(&personalized_tips.equipment_recommendations);
-    }
-
-    if !personalized_tips.shooting_tips.is_empty() {
-        println!("\n🎯 СОВЕТЫ ПО СЪЕМКЕ:");
-        print_photography_tips(&personalized_tips.shooting_tips);
-    }
-
-    if !personalized_tips.location_suggestions.is_empty() {
-        println!("\n📍 РЕКОМЕНДАЦИИ ПО ЛОКАЦИЯМ:");
-        print_photography_tips(&personalized_tips.location_suggestions);
-    }
-
-    if !personalized_tips.technical_settings.is_empty() {
-        println!("\n⚙️ ТЕХНИЧЕСКИЕ НАСТРОЙКИ:");
-        print_photography_tips(&personalized_tips.technical_settings);
-    }
-
-    println!("\n{}", "=== ОБЩИЕ РЕКОМЕНДАЦИИ ===".bold().blue());
-    let general_tips = tips_service.get_general_recommendations();
-    print_photography_tips(&general_tips);
-}
+use log::{debug, error, info};
+use my_dashboard::{
+    generate_dashboard_output, load_environment_variables, validate_coordinates, DashboardOutput,
+};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), anyhow::Error> {
     // Инициализация логирования
     env_logger::init();
 
@@ -135,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "Некорректные координаты: lat={}, lon={}",
             latitude, longitude
         );
-        return Err("Некорректные координаты".into());
+        return Ok(());
     }
 
     debug!(
@@ -143,64 +31,189 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         city, latitude, longitude
     );
 
-    // Создаем дашборд
-    let dashboard = PhotographyDashboard::new(api_key.clone(), city.clone(), latitude, longitude);
-
-    // Генерируем сводку
-    match dashboard.generate_dashboard().await {
-        Ok(summary) => {
-            dashboard.print_dashboard(&summary);
-        }
+    // Генерируем весь дашборд
+    let dashboard_output = match generate_dashboard_output(api_key, city, latitude, longitude).await
+    {
+        Ok(output) => output,
         Err(e) => {
             error!("Ошибка генерации дашборда: {}", e);
-            return Err(e);
+            return Ok(());
         }
-    }
+    };
 
-    println!("\n{}", "📊 ДЕТАЛЬНАЯ ИНФОРМАЦИЯ".bold().cyan());
-
-    // Переменные для хранения данных о погоде и золотом часе
-    let mut weather_score = 0.0;
-    let mut aurora_probability = 0.0;
-
-    // Обрабатываем данные погоды
-    match process_weather_data(api_key.clone(), city.clone()).await {
-        Ok(score) => {
-            weather_score = score;
-        }
-        Err(e) => {
-            error!("Ошибка получения погоды: {}", e);
-            println!("❌ Ошибка получения данных погоды: {}", e);
-        }
-    }
-
-    // Обрабатываем солнечные данные
-    match process_solar_data().await {
-        Ok(probability) => {
-            aurora_probability = probability;
-        }
-        Err(e) => {
-            warn!("Не удалось получить вероятность северных сияний: {}", e);
-            // Оставляем значение по умолчанию 0.0
-        }
-    }
-
-    // Обрабатываем золотой час
-    let is_golden_hour = process_golden_hour(latitude, longitude);
-
-    println!("\n{}", "=== СОВЕТЫ ДЛЯ ФОТОГРАФОВ ===".bold().green());
-
-    // Выводим персонализированные советы
-    print_personalized_tips(weather_score, is_golden_hour, aurora_probability);
+    // Выводим результаты
+    print_dashboard_output(&dashboard_output);
 
     info!("Дашборд завершен успешно");
     Ok(())
 }
 
+fn print_dashboard_output(output: &DashboardOutput) {
+    // Выводим основную сводку дашборда
+    print_dashboard_summary(&output.summary);
+
+    println!("\n{}", "📊 ДЕТАЛЬНАЯ ИНФОРМАЦИЯ".bold().cyan());
+
+    // Выводим данные погоды
+    println!("{}", output.weather_output.current_weather);
+    print!("{}  ", output.weather_output.temperature_range);
+    print!("{}  ", output.weather_output.best_hours);
+    println!("| ⭐ Оценка: {:.1}/10", output.weather_output.overall_score);
+
+    if !output.weather_output.recommendation.is_empty() {
+        print!("{}", output.weather_output.recommendation);
+    }
+
+    if !output.weather_output.concerns.is_empty() {
+        print!(" | {}", output.weather_output.concerns);
+    }
+    println!();
+
+    // Выводим анализ астрофотографии
+    print!(
+        "🌌 Астрофото: {} | ☁️{:.0}% | ",
+        if output.astrophotography_output.is_suitable {
+            "✅"
+        } else {
+            "❌"
+        },
+        output.astrophotography_output.avg_cloud_cover
+    );
+
+    if !output.astrophotography_output.best_hours.is_empty() {
+        print!("{} ", output.astrophotography_output.best_hours);
+    }
+
+    if !output.astrophotography_output.recommendation.is_empty() {
+        print!("| {}", output.astrophotography_output.recommendation);
+    }
+    println!();
+
+    // Выводим солнечные данные
+    println!("{}", output.solar_output.solar_wind);
+    println!("{}", output.solar_output.geomagnetic);
+    println!("{}", output.solar_output.aurora_forecast);
+    if !output.solar_output.best_viewing_hours.is_empty() {
+        println!("   {}", output.solar_output.best_viewing_hours);
+    }
+
+    // Выводим информацию о золотом часе
+    println!("{}", output.golden_hour_output.sunrise_sunset);
+    println!("{}", output.golden_hour_output.golden_hours);
+    println!("{}", output.golden_hour_output.blue_hours);
+    println!(
+        "💡 Текущие условия освещения: {}",
+        output.golden_hour_output.current_condition
+    );
+
+    println!("\n{}", "=== СОВЕТЫ ДЛЯ ФОТОГРАФОВ ===".bold().green());
+
+    // Выводим персонализированные советы
+    print_personalized_tips(&output.tips_output);
+}
+
+fn print_dashboard_summary(summary: &my_dashboard::dashboard::DashboardSummary) {
+    println!("\n{}", "=== ФОТОГРАФИЧЕСКИЙ ДАШБОРД ===".bold().white());
+    println!("{}", "📊 ОБЩАЯ ОЦЕНКА".bold().cyan());
+    println!("   Погода: {:.1}/10", summary.weather_score);
+    println!(
+        "   Вероятность северных сияний: {:.0}%",
+        summary.aurora_probability * 100.0
+    );
+    println!(
+        "   Золотой час: {}",
+        if summary.is_golden_hour_today {
+            "Да"
+        } else {
+            "Нет"
+        }
+    );
+
+    if !summary.best_shooting_hours.is_empty() {
+        // Сжимаем часы до интервалов
+        let mut intervals = Vec::new();
+        let mut start = summary.best_shooting_hours[0];
+        let mut end = start;
+
+        for &hour in &summary.best_shooting_hours[1..] {
+            if hour == end + 1 {
+                end = hour;
+            } else {
+                if start == end {
+                    intervals.push(format!("{:02}:00", start));
+                } else {
+                    intervals.push(format!("{:02}:00-{:02}:00", start, end));
+                }
+                start = hour;
+                end = hour;
+            }
+        }
+        // Добавляем последний интервал
+        if start == end {
+            intervals.push(format!("{:02}:00", start));
+        } else {
+            intervals.push(format!("{:02}:00-{:02}:00", start, end));
+        }
+
+        println!("   Лучшие часы: {}", intervals.join(", "));
+    }
+
+    if !summary.key_highlights.is_empty() {
+        println!("{}", "✨ КЛЮЧЕВЫЕ МОМЕНТЫ".bold().green());
+        for highlight in &summary.key_highlights {
+            println!("   • {}", highlight);
+        }
+    }
+
+    if !summary.warnings.is_empty() {
+        println!("{}", "⚠️ ПРЕДУПРЕЖДЕНИЯ".bold().yellow());
+        for warning in &summary.warnings {
+            println!("   • {}", warning);
+        }
+    }
+
+    println!("{}", "🎯 РЕКОМЕНДАЦИЯ".bold().blue());
+    println!("   {}", summary.overall_recommendation);
+}
+
+fn print_personalized_tips(tips_output: &my_dashboard::PhotographyTipsOutput) {
+    if !tips_output.equipment_recommendations.is_empty() {
+        println!("\n📷 РЕКОМЕНДАЦИИ ПО ОБОРУДОВАНИЮ:");
+        for (i, tip) in tips_output.equipment_recommendations.iter().enumerate() {
+            println!("{}. {}", i + 1, tip);
+        }
+    }
+
+    if !tips_output.shooting_tips.is_empty() {
+        println!("\n🎯 СОВЕТЫ ПО СЪЕМКЕ:");
+        for (i, tip) in tips_output.shooting_tips.iter().enumerate() {
+            println!("{}. {}", i + 1, tip);
+        }
+    }
+
+    if !tips_output.location_suggestions.is_empty() {
+        println!("\n📍 РЕКОМЕНДАЦИИ ПО ЛОКАЦИЯМ:");
+        for (i, tip) in tips_output.location_suggestions.iter().enumerate() {
+            println!("{}. {}", i + 1, tip);
+        }
+    }
+
+    if !tips_output.technical_settings.is_empty() {
+        println!("\n⚙️ ТЕХНИЧЕСКИЕ НАСТРОЙКИ:");
+        for (i, tip) in tips_output.technical_settings.iter().enumerate() {
+            println!("{}. {}", i + 1, tip);
+        }
+    }
+
+    println!("\n{}", "=== ОБЩИЕ РЕКОМЕНДАЦИИ ===".bold().blue());
+    for (i, tip) in tips_output.general_recommendations.iter().enumerate() {
+        println!("{}. {}", i + 1, tip);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Timelike;
 
     #[test]
     fn test_load_environment_variables() {
@@ -212,100 +225,33 @@ mod tests {
     }
 
     #[test]
-    fn test_service_initialization() {
-        let golden_hour_service = GoldenHourService::new(55.7558, 37.6176);
-        assert!((0..=23).contains(
-            &golden_hour_service
-                .calculate_golden_hours(chrono::Local::now())
-                .sunrise
-                .hour()
-        ));
+    fn test_validate_coordinates() {
+        // Валидные координаты
+        assert!(validate_coordinates(55.7558, 37.6176)); // Москва
+        assert!(validate_coordinates(0.0, 0.0)); // Экватор, нулевой меридиан
+        assert!(validate_coordinates(90.0, 180.0)); // Северный полюс, максимальная долгота
+        assert!(validate_coordinates(-90.0, -180.0)); // Южный полюс, минимальная долгота
 
-        let _tips_service = PhotographyTipsService::new();
-        // Просто проверяем, что сервис создается без ошибок
-    }
-
-    #[test]
-    fn test_tips_generation() {
-        let tips_service = PhotographyTipsService::new();
-
-        // Тестируем с разными параметрами
-        let tips_good = tips_service.get_tips_for_weather(8.0, true, 0.7);
-        assert!(!tips_good.equipment_recommendations.is_empty());
-        assert!(!tips_good.shooting_tips.is_empty());
-
-        let tips_bad = tips_service.get_tips_for_weather(3.0, false, 0.1);
-        assert!(!tips_bad.equipment_recommendations.is_empty());
-
-        let general_tips = tips_service.get_general_recommendations();
-        assert_eq!(general_tips.len(), 5);
-    }
-
-    #[test]
-    fn test_tips_output_validation() {
-        let tips_service = PhotographyTipsService::new();
-        let tips = tips_service.get_tips_for_weather(7.0, true, 0.6);
-
-        assert!(
-            !tips.equipment_recommendations.is_empty()
-                || !tips.shooting_tips.is_empty()
-                || !tips.location_suggestions.is_empty()
-                || !tips.technical_settings.is_empty()
-        );
-
-        let general_tips = tips_service.get_general_recommendations();
-        assert_eq!(general_tips.len(), 5);
-        for tip in &general_tips {
-            assert!(!tip.is_empty());
-        }
+        // Невалидные координаты
+        assert!(!validate_coordinates(91.0, 37.6176)); // Широта > 90
+        assert!(!validate_coordinates(-91.0, 37.6176)); // Широта < -90
+        assert!(!validate_coordinates(55.7558, 181.0)); // Долгота > 180
+        assert!(!validate_coordinates(55.7558, -181.0)); // Долгота < -180
     }
 
     #[test]
     fn test_validate_coordinates_comprehensive() {
-        // Тестируем все граничные случаи валидации координат
-        assert!(validate_coordinates(0.0, 0.0));
+        // Тестируем граничные случаи
         assert!(validate_coordinates(90.0, 180.0));
         assert!(validate_coordinates(-90.0, -180.0));
+        assert!(validate_coordinates(0.0, 0.0));
         assert!(validate_coordinates(45.0, 90.0));
         assert!(validate_coordinates(-45.0, -90.0));
 
-        // Невалидные координаты
-        assert!(!validate_coordinates(91.0, 0.0));
-        assert!(!validate_coordinates(-91.0, 0.0));
-        assert!(!validate_coordinates(0.0, 181.0));
-        assert!(!validate_coordinates(0.0, -181.0));
-    }
-
-    #[test]
-    fn test_golden_hour_service_integration() {
-        let service = GoldenHourService::new(55.7558, 37.6176);
-        let current_time = chrono::Local::now();
-        let info = service.calculate_golden_hours(current_time);
-        assert!(info.sunrise < info.sunset);
-        let condition = service.get_current_lighting_condition(current_time);
-        assert!(!condition.is_empty());
-        // Просто вызываем метод, чтобы покрыть код
-        let _ = service.is_golden_hour();
-    }
-
-    #[test]
-    fn test_weather_service_integration() {
-        let _service = WeatherService::new("demo_key".to_string(), "Moscow".to_string());
-        // Проверяем только создание
-    }
-
-    #[test]
-    fn test_photography_tips_service_integration() {
-        let service = PhotographyTipsService::new();
-
-        // Тестируем различные сценарии
-        let tips_excellent = service.get_tips_for_weather(9.0, true, 0.8);
-        assert!(!tips_excellent.equipment_recommendations.is_empty());
-
-        let tips_poor = service.get_tips_for_weather(2.0, false, 0.1);
-        assert!(!tips_poor.equipment_recommendations.is_empty());
-
-        let general_tips = service.get_general_recommendations();
-        assert_eq!(general_tips.len(), 5);
+        // Тестируем невалидные случаи
+        assert!(!validate_coordinates(90.1, 180.0));
+        assert!(!validate_coordinates(-90.1, -180.0));
+        assert!(!validate_coordinates(0.0, 180.1));
+        assert!(!validate_coordinates(0.0, -180.1));
     }
 }
