@@ -4,17 +4,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SolarWindData {
-    pub speed: f64,          // км/с
-    pub density: f64,        // частиц/см³
-    pub temperature: f64,    // К
+    pub speed: f64,                  // км/с
+    pub density: f64,                // частиц/см³
+    pub temperature: f64,            // К
     pub magnetic_field: Option<f64>, // нТл (недоступно в SWEPAM API)
     pub timestamp: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GeomagneticData {
-    pub kp_index: f64,        // Геомагнитный индекс
-    pub aurora_activity: f64, // Активность северных сияний (0-10)
+    pub kp_index: f64,                // Геомагнитный индекс
+    pub aurora_activity: f64,         // Активность северных сияний (0-10)
     pub solar_radiation: Option<f64>, // Солнечная радиация (недоступно в Kp API)
     pub timestamp: DateTime<Utc>,
 }

@@ -9,7 +9,7 @@ use dashboard::PhotographyDashboard;
 use golden_hour::{print_golden_hour_info, GoldenHourService};
 use log::{debug, error, info, warn};
 use photography_tips::{print_photography_tips, PhotographyTipsService};
-use solar::{print_solar_data, predict_aurora};
+use solar::{predict_aurora, print_solar_data};
 use std::env;
 use weather::{print_astrophotography_analysis, print_weather_analysis, WeatherService};
 
@@ -103,7 +103,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match predict_aurora().await {
         Ok(forecast) => {
             aurora_probability = forecast.visibility_probability;
-            debug!("Получена вероятность северных сияний: {:.0}%", aurora_probability * 100.0);
+            debug!(
+                "Получена вероятность северных сияний: {:.0}%",
+                aurora_probability * 100.0
+            );
         }
         Err(e) => {
             warn!("Не удалось получить вероятность северных сияний: {}", e);

@@ -1,8 +1,8 @@
 use crate::golden_hour::{GoldenHourInfo, GoldenHourService};
+use crate::solar::predict_aurora;
 use crate::weather::{analyze_weather_for_photography, WeatherAnalysis, WeatherService};
 use chrono::{DateTime, Local, Timelike};
 use colored::*;
-use crate::solar::predict_aurora;
 
 #[derive(Debug)]
 pub struct DashboardSummary {
@@ -66,10 +66,7 @@ impl PhotographyDashboard {
                     "❌ ОШИБКА ПОЛУЧЕНИЯ ДАННЫХ О СЕВЕРНЫХ СИЯНИЯХ".bold().red()
                 );
                 eprintln!("Причина: {}", e);
-                eprintln!(
-                    "{}",
-                    "💡 РЕШЕНИЕ: Проверьте интернет-соединение".yellow()
-                );
+                eprintln!("{}", "💡 РЕШЕНИЕ: Проверьте интернет-соединение".yellow());
                 return Err(e.into());
             }
         };
@@ -176,7 +173,10 @@ impl PhotographyDashboard {
         println!("\n{}", "=== ФОТОГРАФИЧЕСКИЙ ДАШБОРД ===".bold().white());
         println!("{}", "📊 ОБЩАЯ ОЦЕНКА".bold().cyan());
         println!("   Погода: {:.1}/10", summary.weather_score);
-        println!("   Вероятность северных сияний: {:.0}%", summary.aurora_probability * 100.0);
+        println!(
+            "   Вероятность северных сияний: {:.0}%",
+            summary.aurora_probability * 100.0
+        );
         println!(
             "   Золотой час: {}",
             if summary.is_golden_hour_today {
