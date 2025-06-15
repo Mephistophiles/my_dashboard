@@ -109,7 +109,8 @@ impl GoldenHourService {
 }
 
 pub fn print_golden_hour_info(info: &GoldenHourInfo) {
-    println!("Зол.час: {}-{} | Вечер: {}-{} | Син.утро: {}-{} | Син.вечер: {}-{}",
+    println!(
+        "Зол.час: {}-{} | Вечер: {}-{} | Син.утро: {}-{} | Син.вечер: {}-{}",
         info.golden_hour_morning_start.format("%H:%M"),
         info.golden_hour_morning_end.format("%H:%M"),
         info.golden_hour_evening_start.format("%H:%M"),

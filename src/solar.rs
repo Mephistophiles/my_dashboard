@@ -256,19 +256,24 @@ impl SolarService {
     }
 }
 
-pub fn print_aurora_forecast(forecast: &AuroraForecast, _solar_wind: &SolarWindData, geomagnetic: &GeomagneticData) {
-    print!("Сияние: Kp={:.1} | Вероятн: {:.0}% | {} | Лучшие: ",
+pub fn print_aurora_forecast(
+    forecast: &AuroraForecast,
+    _solar_wind: &SolarWindData,
+    geomagnetic: &GeomagneticData,
+) {
+    print!(
+        "Сияние: Kp={:.1} | Вероятн: {:.0}% | {} | Лучшие: ",
         geomagnetic.kp_index,
         forecast.visibility_probability * 100.0,
         forecast.intensity
     );
-    
+
     // Сжимаем лучшие часы до интервалов
     if !forecast.best_viewing_hours.is_empty() {
         let mut intervals = Vec::new();
         let mut start = forecast.best_viewing_hours[0];
         let mut end = start;
-        
+
         for &hour in &forecast.best_viewing_hours[1..] {
             if hour == end + 1 {
                 end = hour;
@@ -288,13 +293,13 @@ pub fn print_aurora_forecast(forecast: &AuroraForecast, _solar_wind: &SolarWindD
         } else {
             intervals.push(format!("{:02}:00-{:02}:00", start, end));
         }
-        
+
         // Показываем только первые 2 интервала
         for interval in intervals.iter().take(2) {
             print!("{} ", interval);
         }
     }
-    
+
     if !forecast.recommendations.is_empty() {
         print!("| {}", forecast.recommendations[0]);
     }

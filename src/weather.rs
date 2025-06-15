@@ -258,7 +258,7 @@ pub fn analyze_weather_for_photography(forecast: &WeatherForecast) -> WeatherAna
         }
 
         analysis.overall_score += hour_score;
-        
+
         // Добавляем concerns в общий список, если они есть
         analysis.concerns.extend(hour_concerns);
     }
@@ -394,19 +394,38 @@ pub fn print_weather_analysis(analysis: &WeatherAnalysis, forecast: &WeatherFore
             current_weather.description
         );
     }
-    let min_temp = forecast.hourly.iter().map(|w| w.temperature).fold(f64::INFINITY, f64::min);
-    let max_temp = forecast.hourly.iter().map(|w| w.temperature).fold(f64::NEG_INFINITY, f64::max);
-    let max_precip = forecast.hourly.iter().map(|w| w.precipitation_probability).fold(0.0, f64::max);
-    let max_wind = forecast.hourly.iter().map(|w| w.wind_speed).fold(0.0, f64::max);
-    print!("Диапазон: {}-{}°C  Ветер до {:.1}м/с  Осадки до {:.0}%  ", min_temp as i32, max_temp as i32, max_wind, max_precip);
-    
+    let min_temp = forecast
+        .hourly
+        .iter()
+        .map(|w| w.temperature)
+        .fold(f64::INFINITY, f64::min);
+    let max_temp = forecast
+        .hourly
+        .iter()
+        .map(|w| w.temperature)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let max_precip = forecast
+        .hourly
+        .iter()
+        .map(|w| w.precipitation_probability)
+        .fold(0.0, f64::max);
+    let max_wind = forecast
+        .hourly
+        .iter()
+        .map(|w| w.wind_speed)
+        .fold(0.0, f64::max);
+    print!(
+        "Диапазон: {}-{}°C  Ветер до {:.1}м/с  Осадки до {:.0}%  ",
+        min_temp as i32, max_temp as i32, max_wind, max_precip
+    );
+
     // Сжимаем лучшие часы до интервалов
     if !analysis.best_hours.is_empty() {
         print!("Лучшие часы: ");
         let mut intervals = Vec::new();
         let mut start = analysis.best_hours[0];
         let mut end = start;
-        
+
         for &hour in &analysis.best_hours[1..] {
             if hour == end + 1 {
                 end = hour;
@@ -426,19 +445,19 @@ pub fn print_weather_analysis(analysis: &WeatherAnalysis, forecast: &WeatherFore
         } else {
             intervals.push(format!("{:02}:00-{:02}:00", start, end));
         }
-        
+
         // Показываем только первые 3 интервала
         for interval in intervals.iter().take(3) {
             print!("{} ", interval);
         }
     }
-    
+
     println!("| Оценка: {:.1}/10", analysis.overall_score);
-    
+
     if !analysis.recommendations.is_empty() {
         print!("Рекомендация: {}", analysis.recommendations[0]);
     }
-    
+
     if !analysis.concerns.is_empty() {
         print!(" | Проблемы: {}", analysis.concerns[0]);
     }
@@ -454,20 +473,25 @@ pub struct AstrophotographyAnalysis {
     pub concerns: Vec<String>,
 }
 
-pub fn print_astrophotography_analysis(analysis: &AstrophotographyAnalysis, forecast: &WeatherForecast) {
-    let avg_cloud_cover = forecast.hourly.iter().map(|w| w.cloud_cover).sum::<f64>() / forecast.hourly.len() as f64;
-    print!("Астрофото: {} | ☁️{:.0}% | ",
+pub fn print_astrophotography_analysis(
+    analysis: &AstrophotographyAnalysis,
+    forecast: &WeatherForecast,
+) {
+    let avg_cloud_cover =
+        forecast.hourly.iter().map(|w| w.cloud_cover).sum::<f64>() / forecast.hourly.len() as f64;
+    print!(
+        "Астрофото: {} | ☁️{:.0}% | ",
         if analysis.is_suitable { "✅" } else { "❌" },
         avg_cloud_cover
     );
-    
+
     // Сжимаем лучшие часы до интервалов
     if !analysis.best_hours.is_empty() {
         print!("Лучшие часы: ");
         let mut intervals = Vec::new();
         let mut start = analysis.best_hours[0];
         let mut end = start;
-        
+
         for &hour in &analysis.best_hours[1..] {
             if hour == end + 1 {
                 end = hour;
@@ -487,13 +511,13 @@ pub fn print_astrophotography_analysis(analysis: &AstrophotographyAnalysis, fore
         } else {
             intervals.push(format!("{:02}:00-{:02}:00", start, end));
         }
-        
+
         // Показываем только первые 2 интервала
         for interval in intervals.iter().take(2) {
             print!("{} ", interval);
         }
     }
-    
+
     if !analysis.recommendations.is_empty() {
         print!("| {}", analysis.recommendations[0]);
     }

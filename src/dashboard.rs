@@ -266,12 +266,12 @@ impl PhotographyDashboard {
 
         if !summary.best_shooting_hours.is_empty() {
             println!("\n{}:", "Лучшие часы для съемки".bold().yellow());
-            
+
             // Сжимаем часы до интервалов
             let mut intervals = Vec::new();
             let mut start = summary.best_shooting_hours[0];
             let mut end = start;
-            
+
             for &hour in &summary.best_shooting_hours[1..] {
                 if hour == end + 1 {
                     end = hour;
@@ -291,7 +291,7 @@ impl PhotographyDashboard {
             } else {
                 intervals.push(format!("{:02}:00-{:02}:00", start, end));
             }
-            
+
             // Показываем интервалы
             for interval in intervals {
                 println!("  🕐 {}", interval);
