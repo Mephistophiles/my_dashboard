@@ -1,7 +1,7 @@
 use crate::golden_hour::{GoldenHourInfo, GoldenHourService};
 use crate::solar::predict_aurora;
 use crate::weather::{analyze_weather_for_photography, WeatherAnalysis, WeatherService};
-use chrono::{DateTime, Local, Timelike};
+use chrono::{DateTime, Local};
 use colored::*;
 
 #[derive(Debug)]
@@ -119,17 +119,13 @@ impl PhotographyDashboard {
         if is_golden_hour_today {
             key_highlights.push("Сегодня золотой час - идеальное время для съемки!".to_string());
         } else {
-            let _current_hour = current_time.hour() as usize;
-            if current_time.hour() as usize
-                >= golden_hour_info.golden_hour_morning_start.hour() as usize
-                && current_time.hour() as usize
-                    <= golden_hour_info.golden_hour_morning_end.hour() as usize
+            // Используем точную проверку времени вместо только часов
+            if current_time >= golden_hour_info.golden_hour_morning_start
+                && current_time <= golden_hour_info.golden_hour_morning_end
             {
                 key_highlights.push("Сейчас золотой час утром!".to_string());
-            } else if current_time.hour() as usize
-                >= golden_hour_info.golden_hour_evening_start.hour() as usize
-                && current_time.hour() as usize
-                    <= golden_hour_info.golden_hour_evening_end.hour() as usize
+            } else if current_time >= golden_hour_info.golden_hour_evening_start
+                && current_time <= golden_hour_info.golden_hour_evening_end
             {
                 key_highlights.push("Сейчас золотой час вечером!".to_string());
             }
@@ -478,5 +474,79 @@ mod tests {
 
         assert_eq!(summary_low.aurora_probability, 0.0);
         assert_eq!(summary_high.aurora_probability, 1.0);
+    }
+
+    #[test]
+    fn test_golden_hour_precise_time_detection() {
+        let dashboard = PhotographyDashboard::new(
+            "test_key".to_string(),
+            "TestCity".to_string(),
+            55.7558,
+            37.6176,
+        );
+
+        let golden_hour_info = create_test_golden_hour_info();
+
+        // Создаем время точно в золотом часе (например, 21:30, если золотой час 20:15-22:15)
+        let golden_hour_time =
+            golden_hour_info.golden_hour_evening_start + chrono::Duration::minutes(75);
+
+        // Создаем время после окончания золотого часа (например, 22:30, если золотой час 20:15-22:15)
+        let after_golden_hour_time =
+            golden_hour_info.golden_hour_evening_end + chrono::Duration::minutes(15);
+
+        // Проверяем, что время в золотом часе определяется правильно
+        let is_golden_during = dashboard.is_golden_hour_today(&golden_hour_info, golden_hour_time);
+        assert!(
+            is_golden_during,
+            "Время в золотом часе должно определяться как золотой час"
+        );
+
+        // Проверяем, что время после золотого часа определяется правильно
+        let is_golden_after =
+            dashboard.is_golden_hour_today(&golden_hour_info, after_golden_hour_time);
+        assert!(
+            !is_golden_after,
+            "Время после золотого часа не должно определяться как золотой час"
+        );
+
+        // Проверяем, что create_summary правильно обрабатывает эти случаи
+        let weather_analysis = create_test_weather_analysis();
+
+        let summary_during = dashboard.create_summary(
+            &weather_analysis,
+            &golden_hour_info,
+            false, // is_golden_hour_today = false, чтобы проверить логику в else блоке
+            golden_hour_time,
+            0.5,
+        );
+
+        let summary_after = dashboard.create_summary(
+            &weather_analysis,
+            &golden_hour_info,
+            false, // is_golden_hour_today = false, чтобы проверить логику в else блоке
+            after_golden_hour_time,
+            0.5,
+        );
+
+        // Проверяем, что в summary_during есть упоминание золотого часа
+        let has_golden_highlight_during = summary_during
+            .key_highlights
+            .iter()
+            .any(|highlight| highlight.contains("золотой час"));
+        assert!(
+            has_golden_highlight_during,
+            "Должно быть упоминание золотого часа во время золотого часа"
+        );
+
+        // Проверяем, что в summary_after нет упоминания золотого часа
+        let has_golden_highlight_after = summary_after
+            .key_highlights
+            .iter()
+            .any(|highlight| highlight.contains("золотой час"));
+        assert!(
+            !has_golden_highlight_after,
+            "Не должно быть упоминания золотого часа после его окончания"
+        );
     }
 }
