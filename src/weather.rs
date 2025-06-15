@@ -1,3 +1,37 @@
+//! # Weather Module
+//!
+//! Модуль для анализа погодных условий для фотографии.
+//! Предоставляет функциональность для получения прогноза погоды,
+//! анализа условий съемки и оценки пригодности для астрофотографии.
+//!
+//! ## Основные компоненты
+//!
+//! - [`WeatherService`] - Сервис для получения данных о погоде
+//! - [`WeatherForecast`] - Структура прогноза погоды
+//! - [`WeatherAnalysis`] - Результат анализа погодных условий
+//! - [`AstrophotographyAnalysis`] - Анализ условий для астрофотографии
+//!
+//! ## Пример использования
+//!
+//! ```rust
+//! use my_dashboard::weather::{WeatherService, analyze_weather_for_photography};
+//!
+//! // Создаем сервис погоды
+//! let weather_service = WeatherService::new(
+//!     "your_api_key".to_string(),
+//!     "Moscow".to_string(),
+//! );
+//!
+//! // Для асинхронного использования:
+//! // #[tokio::main]
+//! // async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! //     let forecast = weather_service.get_weather_forecast().await?;
+//! //     let analysis = analyze_weather_for_photography(&forecast);
+//! //     println!("Оценка условий: {}/10", analysis.overall_score);
+//! //     Ok(())
+//! // }
+//! ```
+
 use anyhow::Result;
 use chrono::{DateTime, Timelike, Utc};
 use log::{debug, info, warn};

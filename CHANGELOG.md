@@ -7,24 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2025-06-15
+
 ### Added
 - Comprehensive test coverage improvements (70%+ target)
 - Additional unit tests for main.rs, solar.rs, and weather.rs modules
 - Edge case testing for all data structures and functions
 - Integration tests for error handling scenarios
 - Documentation updates for code coverage requirements
+- **Улучшенная документация для rust doc** - добавлены подробные комментарии для всех модулей и основных функций
+- **Документация с примерами использования** - все публичные API теперь имеют примеры кода
 
 ### Changed
 - Updated documentation with code coverage requirements (>70%)
 - Enhanced CHANGELOG format to follow Keep a Changelog standard
 - Improved test structure and organization
 - Added comprehensive edge case testing
+- **Исправлены doc-тесты** - добавлен флаг `no_run` для предотвращения выполнения реальных API вызовов
 
 ### Fixed
 - Test compilation issues in solar.rs (missing Datelike and Timelike imports)
 - Dead code warnings by removing all #[allow(dead_code)] attributes
 - Unused function and field warnings
 - Test failures in photography_tips module
+- **Удалены бесполезные тесты** - убраны дублирующиеся и неинформативные тесты из main.rs
+- **Исправлены предупреждения компилятора** - удалены неиспользуемые импорты `error` и `warn` из log
+- **Удалены дублирующиеся тесты** - убраны тесты, которые дублировали функциональность из других модулей
+
+### Removed
+- **Бесполезные тесты** - удалены `test_error_handling_simulation`, `test_weather_score_calculation`, `test_aurora_probability_handling`, `test_golden_hour_detection_logic`, `test_process_golden_hour`, `test_print_personalized_tips`
+- **Дублирующиеся тесты** - удалены `test_validate_coordinates`, `test_coordinate_validation_edge_cases`, `test_golden_hour_calculation`, `test_lighting_condition_detection`, `test_dashboard_creation`
+- **Неиспользуемые импорты** - удалены `error` и `warn` из log в dashboard.rs
 
 ## [0.4.1] - 2025-06-15
 

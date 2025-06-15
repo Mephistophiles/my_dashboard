@@ -201,7 +201,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
     use chrono::Timelike;
-    use std::env;
 
     #[test]
     fn test_load_environment_variables() {
@@ -210,35 +209,6 @@ mod tests {
         assert!(!api_key.is_empty());
         assert!(!city.is_empty());
         assert!(validate_coordinates(latitude, longitude));
-    }
-
-    #[test]
-    fn test_validate_coordinates() {
-        // Валидные координаты
-        assert!(validate_coordinates(55.7558, 37.6176));
-        assert!(validate_coordinates(0.0, 0.0));
-        assert!(validate_coordinates(90.0, 180.0));
-        assert!(validate_coordinates(-90.0, -180.0));
-
-        // Невалидные координаты
-        assert!(!validate_coordinates(91.0, 37.6176)); // Широта > 90
-        assert!(!validate_coordinates(-91.0, 37.6176)); // Широта < -90
-        assert!(!validate_coordinates(55.7558, 181.0)); // Долгота > 180
-        assert!(!validate_coordinates(55.7558, -181.0)); // Долгота < -180
-    }
-
-    #[test]
-    fn test_coordinate_validation_edge_cases() {
-        // Граничные значения
-        assert!(validate_coordinates(90.0, 180.0));
-        assert!(validate_coordinates(-90.0, -180.0));
-        assert!(validate_coordinates(0.0, 0.0));
-
-        // За границами
-        assert!(!validate_coordinates(90.1, 180.0));
-        assert!(!validate_coordinates(-90.1, -180.0));
-        assert!(!validate_coordinates(0.0, 180.1));
-        assert!(!validate_coordinates(0.0, -180.1));
     }
 
     #[test]
@@ -272,62 +242,6 @@ mod tests {
     }
 
     #[test]
-    fn test_golden_hour_calculation() {
-        let service = GoldenHourService::new(55.7558, 37.6176);
-        let current_time = chrono::Local::now();
-        let info = service.calculate_golden_hours(current_time);
-
-        assert!((0..=23).contains(&info.sunrise.hour()));
-        assert!((0..=23).contains(&info.sunset.hour()));
-        assert!(info.sunrise < info.sunset);
-    }
-
-    #[test]
-    fn test_lighting_condition_detection() {
-        let service = GoldenHourService::new(55.7558, 37.6176);
-        let current_time = chrono::Local::now();
-        let condition = service.get_current_lighting_condition(current_time);
-
-        assert!(!condition.is_empty());
-        assert!(condition.contains("час") || condition.contains("время"));
-    }
-
-    #[test]
-    fn test_dashboard_creation() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
-        assert!(true); // Дашборд создался успешно
-    }
-
-    #[test]
-    fn test_weather_score_calculation() {
-        let weather_score = 8.5;
-        assert!((0.0..=10.0).contains(&weather_score));
-
-        let weather_score2 = 3.2;
-        assert!((0.0..=10.0).contains(&weather_score2));
-
-        let weather_score3 = 0.0;
-        assert!((0.0..=10.0).contains(&weather_score3));
-    }
-
-    #[test]
-    fn test_aurora_probability_handling() {
-        let aurora_probability = 0.8;
-        assert!((0.0..=1.0).contains(&aurora_probability));
-
-        let aurora_probability2 = 0.3;
-        assert!((0.0..=1.0).contains(&aurora_probability2));
-
-        let aurora_probability3 = 0.0;
-        assert!((0.0..=1.0).contains(&aurora_probability3));
-    }
-
-    #[test]
     fn test_tips_output_validation() {
         let tips_service = PhotographyTipsService::new();
         let tips = tips_service.get_tips_for_weather(7.0, true, 0.6);
@@ -347,33 +261,57 @@ mod tests {
     }
 
     #[test]
-    fn test_golden_hour_detection_logic() {
+    fn test_validate_coordinates_comprehensive() {
+        // Тестируем все граничные случаи валидации координат
+        assert!(validate_coordinates(0.0, 0.0));
+        assert!(validate_coordinates(90.0, 180.0));
+        assert!(validate_coordinates(-90.0, -180.0));
+        assert!(validate_coordinates(45.0, 90.0));
+        assert!(validate_coordinates(-45.0, -90.0));
+
+        // Невалидные координаты
+        assert!(!validate_coordinates(91.0, 0.0));
+        assert!(!validate_coordinates(-91.0, 0.0));
+        assert!(!validate_coordinates(0.0, 181.0));
+        assert!(!validate_coordinates(0.0, -181.0));
+    }
+
+    #[test]
+    fn test_golden_hour_service_integration() {
         let service = GoldenHourService::new(55.7558, 37.6176);
-        let is_golden_hour = service.is_golden_hour();
-        assert!(is_golden_hour == true || is_golden_hour == false);
+        let current_time = chrono::Local::now();
+
+        // Тестируем основные методы сервиса
+        let info = service.calculate_golden_hours(current_time);
+        assert!(info.sunrise < info.sunset);
+
+        let condition = service.get_current_lighting_condition(current_time);
+        assert!(!condition.is_empty());
+
+        let is_golden = service.is_golden_hour();
+        assert!(is_golden == true || is_golden == false);
     }
 
     #[test]
-    fn test_error_handling_simulation() {
-        let weather_score = 0.0; // fallback value
-        let aurora_probability = 0.0; // fallback value
+    fn test_weather_service_integration() {
+        let service = WeatherService::new("demo_key".to_string(), "Moscow".to_string());
 
-        assert_eq!(weather_score, 0.0);
-        assert_eq!(aurora_probability, 0.0);
+        // Тестируем создание сервиса (не можем проверить приватные поля)
+        assert!(true); // Сервис создался успешно
     }
 
     #[test]
-    fn test_process_golden_hour() {
-        let is_golden_hour = process_golden_hour(55.7558, 37.6176);
-        assert!(is_golden_hour == true || is_golden_hour == false);
-    }
+    fn test_photography_tips_service_integration() {
+        let service = PhotographyTipsService::new();
 
-    #[test]
-    fn test_print_personalized_tips() {
-        // Тестируем, что функция не падает с разными параметрами
-        print_personalized_tips(8.0, true, 0.7);
-        print_personalized_tips(3.0, false, 0.1);
-        print_personalized_tips(5.0, true, 0.0);
-        assert!(true); // Функция выполнилась без ошибок
+        // Тестируем различные сценарии
+        let tips_excellent = service.get_tips_for_weather(9.0, true, 0.8);
+        assert!(!tips_excellent.equipment_recommendations.is_empty());
+
+        let tips_poor = service.get_tips_for_weather(2.0, false, 0.1);
+        assert!(!tips_poor.equipment_recommendations.is_empty());
+
+        let general_tips = service.get_general_recommendations();
+        assert_eq!(general_tips.len(), 5);
     }
 }

@@ -325,7 +325,7 @@ pub async fn predict_aurora() -> Result<AuroraForecast> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{Datelike, Timelike};
+    use chrono::Timelike;
 
     // Вспомогательные функции для создания тестовых данных
     fn create_test_solar_wind_data() -> SolarWindData {
