@@ -7,7 +7,7 @@ pub struct SolarWindData {
     pub speed: f64,          // км/с
     pub density: f64,        // частиц/см³
     pub temperature: f64,    // К
-    pub magnetic_field: f64, // нТл
+    pub magnetic_field: Option<f64>, // нТл (недоступно в SWEPAM API)
     pub timestamp: DateTime<Utc>,
 }
 
@@ -15,7 +15,7 @@ pub struct SolarWindData {
 pub struct GeomagneticData {
     pub kp_index: f64,        // Геомагнитный индекс
     pub aurora_activity: f64, // Активность северных сияний (0-10)
-    pub solar_radiation: f64, // Солнечная радиация
+    pub solar_radiation: Option<f64>, // Солнечная радиация (недоступно в Kp API)
     pub timestamp: DateTime<Utc>,
 }
 
@@ -161,9 +161,7 @@ async fn fetch_solar_wind_data() -> Result<SolarWindData> {
     // Берем последнюю запись с валидными данными
     let latest_record = records
         .iter()
-        .find(|r| {
-            r.dsflag == 0 && r.dens.is_some() && r.speed.is_some() && r.temperature.is_some()
-        })
+        .find(|r| r.dsflag == 0 && r.dens.is_some() && r.speed.is_some() && r.temperature.is_some())
         .ok_or_else(|| anyhow::anyhow!("No valid solar wind data found"))?;
 
     let timestamp =
@@ -182,7 +180,7 @@ async fn fetch_solar_wind_data() -> Result<SolarWindData> {
         speed: latest_record.speed.unwrap(),
         density: latest_record.dens.unwrap(),
         temperature: latest_record.temperature.unwrap(),
-        magnetic_field: 0.0, // Нет данных о магнитном поле в SWEPAM
+        magnetic_field: None, // Нет данных о магнитном поле в SWEPAM
         timestamp,
     })
 }
@@ -249,12 +247,12 @@ async fn fetch_geomagnetic_data() -> Result<GeomagneticData> {
     Ok(GeomagneticData {
         kp_index: latest_record.kp_index,
         aurora_activity,
-        solar_radiation: 0.0, // Нет данных о солнечной радиации
+        solar_radiation: None, // Нет данных о солнечной радиации
         timestamp,
     })
 }
 
-async fn predict_aurora() -> Result<AuroraForecast> {
+pub async fn predict_aurora() -> Result<AuroraForecast> {
     let solar_wind = fetch_solar_wind_data().await?;
     let geomagnetic = fetch_geomagnetic_data().await?;
 

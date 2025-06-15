@@ -7,19 +7,17 @@ mod weather;
 use colored::*;
 use dashboard::PhotographyDashboard;
 use golden_hour::{print_golden_hour_info, GoldenHourService};
-use log::{debug, info, warn, error};
+use log::{debug, error, info, warn};
 use photography_tips::{print_photography_tips, PhotographyTipsService};
-use solar::print_solar_data;
+use solar::{print_solar_data, predict_aurora};
 use std::env;
-use weather::{
-    print_astrophotography_analysis, print_weather_analysis, WeatherService,
-};
+use weather::{print_astrophotography_analysis, print_weather_analysis, WeatherService};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Инициализация логирования
     env_logger::init();
-    
+
     // Загружаем переменные окружения из файла .env
     dotenv::dotenv().ok();
 
@@ -31,27 +29,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         warn!("OPENWEATHER_API_KEY не найден, используем demo_key");
         "demo_key".to_string()
     });
-    
+
     let city = env::var("CITY").unwrap_or_else(|_| {
         info!("CITY не найден, используем Москва");
         "Moscow".to_string()
     });
-    
+
     let latitude = env::var("LATITUDE")
         .unwrap_or_else(|_| "55.7558".to_string())
         .parse::<f64>()
         .unwrap_or(55.7558);
-    
+
     let longitude = env::var("LONGITUDE")
         .unwrap_or_else(|_| "37.6176".to_string())
         .parse::<f64>()
         .unwrap_or(37.6176);
 
-    debug!("Параметры: город={}, широта={}, долгота={}", city, latitude, longitude);
+    debug!(
+        "Параметры: город={}, широта={}, долгота={}",
+        city, latitude, longitude
+    );
 
     // Создаем дашборд
     let dashboard = PhotographyDashboard::new(api_key.clone(), city.clone(), latitude, longitude);
-    
+
     // Генерируем сводку
     match dashboard.generate_dashboard().await {
         Ok(summary) => {
@@ -67,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Переменные для хранения данных о погоде и золотом часе
     let mut weather_score = 0.0;
-    let aurora_probability = 0.0;
+    let mut aurora_probability = 0.0;
 
     // Погода
     let weather_service = WeatherService::new(api_key, city);
@@ -75,11 +76,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(forecast) => {
             debug!("Получен прогноз погоды: {} записей", forecast.hourly.len());
             print_weather_analysis(&forecast);
-            
+
             // Получаем оценку погоды для советов
             let analysis = weather::analyze_weather_for_photography(&forecast);
             weather_score = analysis.overall_score;
-            
+
             // Астрофотография
             print_astrophotography_analysis(&forecast);
         }
@@ -89,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Солнечные данные
+    // Солнечные данные и получаем вероятность сияний
     match print_solar_data().await {
         Ok(_) => debug!("Солнечные данные успешно получены"),
         Err(e) => {
@@ -98,10 +99,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Получаем реальную вероятность северных сияний
+    match predict_aurora().await {
+        Ok(forecast) => {
+            aurora_probability = forecast.visibility_probability;
+            debug!("Получена вероятность северных сияний: {:.0}%", aurora_probability * 100.0);
+        }
+        Err(e) => {
+            warn!("Не удалось получить вероятность северных сияний: {}", e);
+            // Оставляем значение по умолчанию 0.0
+        }
+    }
+
     // Золотой час
     let golden_hour_service = GoldenHourService::new(latitude, longitude);
     print_golden_hour_info(&golden_hour_service);
-    
+
     // Проверяем, сейчас ли золотой час
     let is_golden_hour = golden_hour_service.is_golden_hour();
 
@@ -109,11 +122,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Советы по фотографии с учетом реальных данных
     let tips_service = PhotographyTipsService::new();
-    let personalized_tips = tips_service.get_tips_for_weather(
-        weather_score,
-        is_golden_hour,
-        aurora_probability,
-    );
+    let personalized_tips =
+        tips_service.get_tips_for_weather(weather_score, is_golden_hour, aurora_probability);
 
     // Выводим персонализированные советы
     if !personalized_tips.equipment_recommendations.is_empty() {

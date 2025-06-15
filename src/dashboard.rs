@@ -2,6 +2,7 @@ use crate::golden_hour::{GoldenHourInfo, GoldenHourService};
 use crate::weather::{analyze_weather_for_photography, WeatherAnalysis, WeatherService};
 use chrono::{DateTime, Local, Timelike};
 use colored::*;
+use crate::solar::predict_aurora;
 
 #[derive(Debug)]
 pub struct DashboardSummary {
@@ -56,12 +57,30 @@ impl PhotographyDashboard {
         // Определяем, есть ли золотой час сегодня
         let is_golden_hour_today = self.is_golden_hour_today(&golden_hour_info, current_time);
 
+        // Получаем вероятность северных сияний
+        let aurora_probability = match predict_aurora().await {
+            Ok(forecast) => forecast.visibility_probability,
+            Err(e) => {
+                eprintln!(
+                    "{}",
+                    "❌ ОШИБКА ПОЛУЧЕНИЯ ДАННЫХ О СЕВЕРНЫХ СИЯНИЯХ".bold().red()
+                );
+                eprintln!("Причина: {}", e);
+                eprintln!(
+                    "{}",
+                    "💡 РЕШЕНИЕ: Проверьте интернет-соединение".yellow()
+                );
+                return Err(e.into());
+            }
+        };
+
         // Создаем общую сводку
         let summary = self.create_summary(
             &weather_analysis,
             &golden_hour_info,
             is_golden_hour_today,
             current_time,
+            aurora_probability,
         );
 
         Ok(summary)
@@ -85,6 +104,7 @@ impl PhotographyDashboard {
         golden_hour_info: &GoldenHourInfo,
         is_golden_hour_today: bool,
         current_time: DateTime<Local>,
+        aurora_probability: f64,
     ) -> DashboardSummary {
         let mut key_highlights = Vec::new();
         let mut warnings = Vec::new();
@@ -128,7 +148,7 @@ impl PhotographyDashboard {
         DashboardSummary {
             overall_recommendation,
             weather_score: weather_analysis.overall_score,
-            aurora_probability: 0.0, // Убираем зависимость от aurora
+            aurora_probability,
             is_golden_hour_today,
             best_shooting_hours,
             key_highlights,
@@ -156,6 +176,7 @@ impl PhotographyDashboard {
         println!("\n{}", "=== ФОТОГРАФИЧЕСКИЙ ДАШБОРД ===".bold().white());
         println!("{}", "📊 ОБЩАЯ ОЦЕНКА".bold().cyan());
         println!("   Погода: {:.1}/10", summary.weather_score);
+        println!("   Вероятность северных сияний: {:.0}%", summary.aurora_probability * 100.0);
         println!(
             "   Золотой час: {}",
             if summary.is_golden_hour_today {
