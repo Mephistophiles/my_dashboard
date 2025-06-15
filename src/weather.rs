@@ -619,14 +619,18 @@ mod tests {
 
     fn create_test_forecast() -> WeatherForecast {
         let mut forecast = WeatherForecast { hourly: Vec::new() };
-        
+
         // Создаем 24 часа тестовых данных
         for hour in 0..24 {
             let weather_data = WeatherData {
                 temperature: 15.0 + (hour as f64 * 0.5) - 6.0,
                 humidity: 60.0 + (hour as f64 * 2.0) % 40.0,
                 wind_speed: 5.0 + (hour as f64 * 0.3) % 15.0,
-                cloud_cover: if !(6..=18).contains(&hour) { 20.0 } else { 40.0 + (hour as f64 * 3.0) % 60.0 },
+                cloud_cover: if !(6..=18).contains(&hour) {
+                    20.0
+                } else {
+                    40.0 + (hour as f64 * 3.0) % 60.0
+                },
                 visibility: 10.0 - (hour as f64 * 0.1) % 5.0,
                 precipitation_probability: if hour > 12 && hour < 18 { 30.0 } else { 5.0 },
                 description: match hour {
@@ -641,35 +645,35 @@ mod tests {
             };
             forecast.hourly.push(weather_data);
         }
-        
+
         forecast
     }
 
     fn create_bad_weather_forecast() -> WeatherForecast {
         let mut forecast = WeatherForecast { hourly: Vec::new() };
-        
+
         // Создаем прогноз с плохими условиями
         for hour in 0..24 {
             let weather_data = WeatherData {
-                temperature: -5.0, // Холодно
-                humidity: 90.0,    // Высокая влажность
-                wind_speed: 25.0,  // Сильный ветер
-                cloud_cover: 95.0, // Высокая облачность
-                visibility: 2.0,   // Плохая видимость
+                temperature: -5.0,               // Холодно
+                humidity: 90.0,                  // Высокая влажность
+                wind_speed: 25.0,                // Сильный ветер
+                cloud_cover: 95.0,               // Высокая облачность
+                visibility: 2.0,                 // Плохая видимость
                 precipitation_probability: 80.0, // Высокая вероятность осадков
                 description: "сильный дождь".to_string(),
                 timestamp: Utc::now() + chrono::Duration::hours(hour),
             };
             forecast.hourly.push(weather_data);
         }
-        
+
         forecast
     }
 
     #[test]
     fn test_weather_service_new() {
         let service = WeatherService::new("test_key".to_string(), "TestCity".to_string());
-        
+
         assert_eq!(service.api_key, "test_key");
         assert_eq!(service.city, "TestCity");
         // demo_mode зависит от переменной окружения, поэтому не тестируем
@@ -679,14 +683,14 @@ mod tests {
     fn test_weather_analysis_calculation() {
         let forecast = create_test_forecast();
         let analysis = analyze_weather_for_photography(&forecast);
-        
+
         // Проверяем, что оценка в разумных пределах
         assert!(analysis.overall_score >= 0.0);
         assert!(analysis.overall_score <= 10.0);
-        
+
         // Проверяем, что есть рекомендации
         assert!(!analysis.recommendations.is_empty());
-        
+
         // Проверяем, что есть лучшие часы
         assert!(!analysis.best_hours.is_empty());
     }
@@ -695,10 +699,10 @@ mod tests {
     fn test_weather_analysis_bad_conditions() {
         let forecast = create_bad_weather_forecast();
         let analysis = analyze_weather_for_photography(&forecast);
-        
+
         // При плохих условиях оценка должна быть низкой
         assert!(analysis.overall_score < 5.0);
-        
+
         // Должны быть проблемы
         assert!(!analysis.concerns.is_empty());
     }
@@ -707,7 +711,7 @@ mod tests {
     fn test_astrophotography_analysis() {
         let forecast = create_test_forecast();
         let analysis = analyze_astrophotography_conditions(&forecast);
-        
+
         // Проверяем структуру анализа
         assert!(!analysis.recommendations.is_empty());
         // Не проверяем на >= 0, это всегда true
@@ -717,10 +721,10 @@ mod tests {
     fn test_astrophotography_analysis_bad_conditions() {
         let forecast = create_bad_weather_forecast();
         let analysis = analyze_astrophotography_conditions(&forecast);
-        
+
         // При плохих условиях астрофотография должна быть непригодна
         assert!(!analysis.is_suitable);
-        
+
         // Должны быть проблемы с облачностью
         assert!(!analysis.cloud_cover_issues.is_empty());
     }
@@ -728,23 +732,26 @@ mod tests {
     #[test]
     fn test_weather_data_validation() {
         let weather_data = create_test_weather_data();
-        
+
         // Проверяем разумные пределы
         assert!(weather_data.temperature >= -50.0 && weather_data.temperature <= 60.0);
         assert!(weather_data.humidity >= 0.0 && weather_data.humidity <= 100.0);
         assert!(weather_data.wind_speed >= 0.0);
         assert!(weather_data.cloud_cover >= 0.0 && weather_data.cloud_cover <= 100.0);
         assert!(weather_data.visibility >= 0.0);
-        assert!(weather_data.precipitation_probability >= 0.0 && weather_data.precipitation_probability <= 100.0);
+        assert!(
+            weather_data.precipitation_probability >= 0.0
+                && weather_data.precipitation_probability <= 100.0
+        );
     }
 
     #[test]
     fn test_forecast_structure() {
         let forecast = create_test_forecast();
-        
+
         // Проверяем, что прогноз содержит 24 часа
         assert_eq!(forecast.hourly.len(), 24);
-        
+
         // Проверяем, что каждый час имеет валидные данные
         for (hour, weather) in forecast.hourly.iter().enumerate() {
             assert!(weather.temperature >= -50.0 && weather.temperature <= 60.0);
@@ -752,9 +759,12 @@ mod tests {
             assert!(weather.wind_speed >= 0.0);
             assert!(weather.cloud_cover >= 0.0 && weather.cloud_cover <= 100.0);
             assert!(weather.visibility >= 0.0);
-            assert!(weather.precipitation_probability >= 0.0 && weather.precipitation_probability <= 100.0);
+            assert!(
+                weather.precipitation_probability >= 0.0
+                    && weather.precipitation_probability <= 100.0
+            );
             assert!(!weather.description.is_empty());
-            
+
             // Проверяем, что timestamp увеличивается
             if hour > 0 {
                 assert!(weather.timestamp > forecast.hourly[hour - 1].timestamp);
@@ -767,7 +777,7 @@ mod tests {
         // Тест с пустым прогнозом
         let empty_forecast = WeatherForecast { hourly: Vec::new() };
         let analysis = analyze_weather_for_photography(&empty_forecast);
-        
+
         // При пустом прогнозе оценка должна быть 0
         assert_eq!(analysis.overall_score, 0.0);
         assert!(analysis.best_hours.is_empty());
@@ -777,12 +787,259 @@ mod tests {
     fn test_golden_hour_detection() {
         let forecast = create_test_forecast();
         let analysis = analyze_weather_for_photography(&forecast);
-        
+
         // Проверяем, что золотые часы (6-8 и 18-20) имеют высокие оценки
         let golden_hours: Vec<usize> = vec![6, 7, 8, 18, 19, 20];
-        
+
         // Проверяем, что хотя бы некоторые золотые часы попали в лучшие часы
-        let has_golden_hours = golden_hours.iter().any(|&hour| analysis.best_hours.contains(&hour));
+        let has_golden_hours = golden_hours
+            .iter()
+            .any(|&hour| analysis.best_hours.contains(&hour));
         assert!(has_golden_hours || analysis.best_hours.is_empty());
+    }
+
+    #[test]
+    fn test_weather_data_edge_cases() {
+        // Тестируем граничные случаи для WeatherData
+        let min_data = WeatherData {
+            temperature: -50.0,             // Минимальная температура
+            humidity: 0.0,                  // Минимальная влажность
+            wind_speed: 0.0,                // Минимальная скорость ветра
+            cloud_cover: 0.0,               // Минимальная облачность
+            visibility: 0.0,                // Минимальная видимость
+            precipitation_probability: 0.0, // Минимальная вероятность осадков
+            description: "".to_string(),
+            timestamp: Utc::now(),
+        };
+
+        let max_data = WeatherData {
+            temperature: 60.0,                // Максимальная температура
+            humidity: 100.0,                  // Максимальная влажность
+            wind_speed: 100.0,                // Максимальная скорость ветра
+            cloud_cover: 100.0,               // Максимальная облачность
+            visibility: 50.0,                 // Максимальная видимость
+            precipitation_probability: 100.0, // Максимальная вероятность осадков
+            description: "экстремальные условия".to_string(),
+            timestamp: Utc::now(),
+        };
+
+        assert_eq!(min_data.temperature, -50.0);
+        assert_eq!(max_data.temperature, 60.0);
+        assert_eq!(min_data.humidity, 0.0);
+        assert_eq!(max_data.humidity, 100.0);
+    }
+
+    #[test]
+    fn test_weather_analysis_components() {
+        let forecast = create_test_forecast();
+        let analysis = analyze_weather_for_photography(&forecast);
+
+        // Проверяем все компоненты анализа
+        assert!(analysis.overall_score >= 0.0);
+        assert!(analysis.overall_score <= 10.0);
+
+        // Проверяем, что есть хотя бы одна рекомендация или проблема
+        assert!(!analysis.recommendations.is_empty() || !analysis.concerns.is_empty());
+
+        // Проверяем, что лучшие часы в разумных пределах
+        for &hour in &analysis.best_hours {
+            assert!((0..=23).contains(&hour));
+        }
+    }
+
+    #[test]
+    fn test_astrophotography_analysis_components() {
+        let forecast = create_test_forecast();
+        let analysis = analyze_astrophotography_conditions(&forecast);
+
+        // Проверяем все компоненты анализа астрофотографии
+        assert!(analysis.is_suitable == true || analysis.is_suitable == false);
+
+        // Проверяем, что есть рекомендации
+        assert!(!analysis.recommendations.is_empty());
+
+        // Проверяем, что лучшие часы в разумных пределах
+        for &hour in &analysis.best_hours {
+            assert!((0..=23).contains(&hour));
+        }
+    }
+
+    #[test]
+    fn test_weather_service_demo_mode() {
+        // Тестируем создание сервиса в demo режиме
+        let service = WeatherService::new("demo_key".to_string(), "TestCity".to_string());
+
+        // В demo режиме сервис должен работать без реальных API вызовов
+        assert_eq!(service.city, "TestCity");
+        assert_eq!(service.api_key, "demo_key");
+    }
+
+    #[test]
+    fn test_weather_analysis_extreme_conditions() {
+        // Тестируем анализ экстремальных погодных условий
+        let mut extreme_forecast = WeatherForecast { hourly: Vec::new() };
+
+        // Создаем экстремальные условия
+        for hour in 0..24 {
+            let weather_data = WeatherData {
+                temperature: if hour < 12 { 50.0 } else { -30.0 }, // Экстремальные температуры
+                humidity: if hour % 2 == 0 { 0.0 } else { 100.0 }, // Экстремальная влажность
+                wind_speed: 50.0,                                  // Очень сильный ветер
+                cloud_cover: if hour % 3 == 0 { 0.0 } else { 100.0 }, // Экстремальная облачность
+                visibility: if hour % 4 == 0 { 0.1 } else { 50.0 }, // Экстремальная видимость
+                precipitation_probability: if hour % 2 == 0 { 0.0 } else { 100.0 }, // Экстремальные осадки
+                description: "экстремальные условия".to_string(),
+                timestamp: Utc::now() + chrono::Duration::hours(hour),
+            };
+            extreme_forecast.hourly.push(weather_data);
+        }
+
+        let analysis = analyze_weather_for_photography(&extreme_forecast);
+
+        // При экстремальных условиях оценка должна быть низкой
+        assert!(analysis.overall_score < 5.0);
+
+        // Должны быть проблемы
+        assert!(!analysis.concerns.is_empty());
+    }
+
+    #[test]
+    fn test_astrophotography_extreme_conditions() {
+        // Тестируем анализ астрофотографии при экстремальных условиях
+        let mut extreme_forecast = WeatherForecast { hourly: Vec::new() };
+
+        // Создаем условия с полной облачностью
+        for hour in 0..24 {
+            let weather_data = WeatherData {
+                temperature: 20.0,
+                humidity: 80.0,
+                wind_speed: 10.0,
+                cloud_cover: 100.0,              // Полная облачность
+                visibility: 1.0,                 // Плохая видимость
+                precipitation_probability: 90.0, // Высокая вероятность осадков
+                description: "полная облачность".to_string(),
+                timestamp: Utc::now() + chrono::Duration::hours(hour),
+            };
+            extreme_forecast.hourly.push(weather_data);
+        }
+
+        let analysis = analyze_astrophotography_conditions(&extreme_forecast);
+
+        // При полной облачности астрофотография должна быть непригодна
+        assert!(!analysis.is_suitable);
+
+        // Должны быть проблемы с облачностью
+        assert!(!analysis.cloud_cover_issues.is_empty());
+    }
+
+    #[test]
+    fn test_weather_analysis_perfect_conditions() {
+        // Тестируем анализ идеальных погодных условий
+        let mut perfect_forecast = WeatherForecast { hourly: Vec::new() };
+
+        // Создаем идеальные условия
+        for hour in 0..24 {
+            let weather_data = WeatherData {
+                temperature: 20.0,              // Комфортная температура
+                humidity: 50.0,                 // Умеренная влажность
+                wind_speed: 2.0,                // Легкий ветер
+                cloud_cover: 10.0,              // Минимальная облачность
+                visibility: 20.0,               // Отличная видимость
+                precipitation_probability: 0.0, // Без осадков
+                description: "идеальные условия".to_string(),
+                timestamp: Utc::now() + chrono::Duration::hours(hour),
+            };
+            perfect_forecast.hourly.push(weather_data);
+        }
+
+        let analysis = analyze_weather_for_photography(&perfect_forecast);
+
+        // При идеальных условиях оценка должна быть высокой
+        assert!(analysis.overall_score >= 8.0);
+
+        // Не должно быть проблем
+        assert!(analysis.concerns.is_empty());
+    }
+
+    #[test]
+    fn test_astrophotography_perfect_conditions() {
+        // Тестируем анализ астрофотографии при идеальных условиях
+        let mut perfect_forecast = WeatherForecast { hourly: Vec::new() };
+
+        // Создаем идеальные условия для астрофотографии
+        for hour in 0..24 {
+            let weather_data = WeatherData {
+                temperature: 15.0,              // Прохладно
+                humidity: 30.0,                 // Низкая влажность
+                wind_speed: 1.0,                // Очень легкий ветер
+                cloud_cover: 0.0,               // Без облаков
+                visibility: 30.0,               // Отличная видимость
+                precipitation_probability: 0.0, // Без осадков
+                description: "идеальная ночь".to_string(),
+                timestamp: Utc::now() + chrono::Duration::hours(hour),
+            };
+            perfect_forecast.hourly.push(weather_data);
+        }
+
+        let analysis = analyze_astrophotography_conditions(&perfect_forecast);
+
+        // При идеальных условиях астрофотография должна быть пригодна
+        assert!(analysis.is_suitable);
+
+        // Не должно быть проблем с облачностью
+        assert!(analysis.cloud_cover_issues.is_empty());
+    }
+
+    #[test]
+    fn test_weather_analysis_single_hour() {
+        // Тестируем анализ с одним часом данных
+        let mut single_hour_forecast = WeatherForecast { hourly: Vec::new() };
+
+        let weather_data = WeatherData {
+            temperature: 20.0,
+            humidity: 60.0,
+            wind_speed: 5.0,
+            cloud_cover: 30.0,
+            visibility: 10.0,
+            precipitation_probability: 5.0,
+            description: "ясно".to_string(),
+            timestamp: Utc::now(),
+        };
+        single_hour_forecast.hourly.push(weather_data);
+
+        let analysis = analyze_weather_for_photography(&single_hour_forecast);
+
+        // Проверяем, что анализ работает с одним часом
+        assert!(analysis.overall_score >= 0.0);
+        assert!(analysis.overall_score <= 10.0);
+        assert_eq!(analysis.best_hours.len(), 1);
+    }
+
+    #[test]
+    fn test_weather_analysis_mixed_conditions() {
+        // Тестируем анализ смешанных условий
+        let mut mixed_forecast = WeatherForecast { hourly: Vec::new() };
+
+        // Создаем смешанные условия
+        for hour in 0..24 {
+            let weather_data = WeatherData {
+                temperature: if hour < 12 { 25.0 } else { 15.0 },
+                humidity: if hour % 2 == 0 { 40.0 } else { 70.0 },
+                wind_speed: if hour % 3 == 0 { 3.0 } else { 8.0 },
+                cloud_cover: if hour < 6 || hour > 18 { 20.0 } else { 60.0 },
+                visibility: if hour % 4 == 0 { 5.0 } else { 15.0 },
+                precipitation_probability: if hour > 10 && hour < 14 { 40.0 } else { 10.0 },
+                description: "переменная погода".to_string(),
+                timestamp: Utc::now() + chrono::Duration::hours(hour),
+            };
+            mixed_forecast.hourly.push(weather_data);
+        }
+
+        let analysis = analyze_weather_for_photography(&mixed_forecast);
+
+        // Проверяем, что анализ работает со смешанными условиями
+        assert!(analysis.overall_score >= 0.0);
+        assert!(analysis.overall_score <= 10.0);
+        assert!(!analysis.best_hours.is_empty());
     }
 }

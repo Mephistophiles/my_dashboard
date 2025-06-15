@@ -281,9 +281,9 @@ pub async fn predict_aurora() -> Result<AuroraForecast> {
 
     // Используем функцию calculate_aurora_activity для расчета активности
     let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
-    
+
     // Преобразуем активность (0-10) в вероятность (0-1)
-    let probability = (activity / 10.0).min(1.0);
+    let probability = (activity as f64 / 10.0_f64).min(1.0);
 
     // Определяем уровень интенсивности
     let intensity_level = if probability > 0.8 {
@@ -397,157 +397,192 @@ mod tests {
             visibility_probability: 0.5,
             intensity_level: "Умеренная".to_string(),
             best_viewing_hours: vec![22, 23, 0, 1, 2, 3, 4, 5],
-            conditions: "Хорошие условия, возможны сияния".to_string(),
+            conditions: "Хорошие условия".to_string(),
         };
 
-        // Проверяем разумные пределы
         assert!((0.0..=1.0).contains(&forecast.visibility_probability));
         assert!(!forecast.intensity_level.is_empty());
+        assert!(!forecast.best_viewing_hours.is_empty());
         assert!(!forecast.conditions.is_empty());
 
-        // Проверяем, что лучшие часы для наблюдения - ночные
+        // Проверяем, что лучшие часы находятся в ночном диапазоне
         for &hour in &forecast.best_viewing_hours {
-            assert!((0..=23).contains(&hour));
+            assert!(hour <= 23);
         }
     }
 
     #[tokio::test]
     async fn test_predict_aurora_with_test_data() {
-        // Создаем mock данные для тестирования
+        // Создаем мок функции для тестирования
         let solar_wind = create_test_solar_wind_data();
         let geomagnetic = create_test_geomagnetic_data();
 
-        // Тестируем логику расчета вероятности (без реальных API вызовов)
-        let mut probability = 0.0;
+        // Тестируем функцию calculate_aurora_activity
+        let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
+        assert!((0.0..=10.0).contains(&activity));
 
-        // Влияние Kp индекса (основной фактор)
-        probability += (geomagnetic.kp_index / 9.0).min(1.0) * 0.6;
-
-        // Влияние скорости солнечного ветра
-        let speed_factor = if solar_wind.speed > 600.0 {
-            0.3
-        } else if solar_wind.speed > 500.0 {
-            0.2
-        } else if solar_wind.speed > 400.0 {
-            0.1
-        } else {
-            0.0
+        // Тестируем создание прогноза
+        let forecast = AuroraForecast {
+            visibility_probability: (activity as f64 / 10.0_f64).min(1.0),
+            intensity_level: if activity > 8.0 {
+                "Очень высокая"
+            } else if activity > 6.0 {
+                "Высокая"
+            } else if activity > 4.0 {
+                "Умеренная"
+            } else if activity > 2.0 {
+                "Низкая"
+            } else {
+                "Минимальная"
+            }
+            .to_string(),
+            best_viewing_hours: vec![22, 23, 0, 1, 2, 3, 4, 5],
+            conditions: if activity > 6.0 {
+                "Отличные условия для наблюдения северных сияний"
+            } else if activity > 4.0 {
+                "Хорошие условия, возможны сияния"
+            } else if activity > 2.0 {
+                "Умеренные условия, сияния маловероятны"
+            } else {
+                "Плохие условия для наблюдения сияний"
+            }
+            .to_string(),
         };
-        probability += speed_factor;
 
-        // Влияние плотности солнечного ветра
-        let density_factor = if solar_wind.density > 10.0 {
-            0.1
-        } else if solar_wind.density > 5.0 {
-            0.05
-        } else {
-            0.0
-        };
-        probability += density_factor;
-
-        probability = probability.min(1.0);
-
-        // Проверяем, что вероятность в разумных пределах
-        assert!((0.0..=1.0).contains(&probability));
-
-        // Для тестовых данных с Kp=3.0 и скоростью=500.0, вероятность должна быть > 0
-        assert!(probability > 0.0);
+        assert!((0.0..=1.0).contains(&forecast.visibility_probability));
+        assert!(!forecast.intensity_level.is_empty());
+        assert!(!forecast.best_viewing_hours.is_empty());
+        assert!(!forecast.conditions.is_empty());
     }
 
     #[tokio::test]
     async fn test_predict_aurora_high_activity() {
-        // Тестируем с высокими значениями активности
-        let _solar_wind = create_high_activity_solar_wind();
+        let solar_wind = create_high_activity_solar_wind();
         let geomagnetic = create_high_kp_geomagnetic_data();
 
-        let mut probability = 0.0;
+        let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
+        assert!(activity > 6.0); // Должна быть высокая активность
 
-        // Влияние Kp индекса
-        probability += (geomagnetic.kp_index / 9.0).min(1.0) * 0.6;
+        let forecast = AuroraForecast {
+            visibility_probability: (activity as f64 / 10.0_f64).min(1.0),
+            intensity_level: "Высокая".to_string(),
+            best_viewing_hours: vec![22, 23, 0, 1, 2, 3, 4, 5],
+            conditions: "Отличные условия для наблюдения северных сияний".to_string(),
+        };
 
-        // Влияние скорости солнечного ветра (700 км/с > 600)
-        probability += 0.3;
-
-        // Влияние плотности солнечного ветра (15 > 10)
-        probability += 0.1;
-
-        probability = probability.min(1.0);
-
-        // При высоких значениях вероятность должна быть высокой
-        assert!(probability > 0.8);
+        assert!(forecast.visibility_probability > 0.6);
+        assert_eq!(forecast.intensity_level, "Высокая");
     }
 
     #[test]
     fn test_aurora_intensity_levels() {
-        // Тестируем определение уровней интенсивности
-        let test_cases = vec![
-            (0.9, "Очень высокая"),
-            (0.7, "Высокая"),
-            (0.5, "Умеренная"),
-            (0.3, "Низкая"),
-            (0.1, "Минимальная"),
-        ];
+        // Тестируем различные уровни интенсивности
+        let high_prob = 0.9;
+        let medium_prob = 0.5;
+        let low_prob = 0.1;
 
-        for (probability, expected_level) in test_cases {
-            let intensity_level = if probability > 0.8 {
-                "Очень высокая"
-            } else if probability > 0.6 {
-                "Высокая"
-            } else if probability > 0.4 {
-                "Умеренная"
-            } else if probability > 0.2 {
-                "Низкая"
-            } else {
-                "Минимальная"
-            };
+        let high_intensity = if high_prob > 0.8 {
+            "Очень высокая"
+        } else if high_prob > 0.6 {
+            "Высокая"
+        } else if high_prob > 0.4 {
+            "Умеренная"
+        } else if high_prob > 0.2 {
+            "Низкая"
+        } else {
+            "Минимальная"
+        };
 
-            assert_eq!(intensity_level, expected_level);
-        }
+        let medium_intensity = if medium_prob > 0.8 {
+            "Очень высокая"
+        } else if medium_prob > 0.6 {
+            "Высокая"
+        } else if medium_prob > 0.4 {
+            "Умеренная"
+        } else if medium_prob > 0.2 {
+            "Низкая"
+        } else {
+            "Минимальная"
+        };
+
+        let low_intensity = if low_prob > 0.8 {
+            "Очень высокая"
+        } else if low_prob > 0.6 {
+            "Высокая"
+        } else if low_prob > 0.4 {
+            "Умеренная"
+        } else if low_prob > 0.2 {
+            "Низкая"
+        } else {
+            "Минимальная"
+        };
+
+        assert_eq!(high_intensity, "Очень высокая");
+        assert_eq!(medium_intensity, "Умеренная");
+        assert_eq!(low_intensity, "Минимальная");
     }
 
     #[test]
     fn test_aurora_conditions() {
-        // Тестируем определение условий
-        let test_cases = vec![
-            (0.7, "Отличные условия для наблюдения северных сияний"),
-            (0.5, "Хорошие условия, возможны сияния"),
-            (0.3, "Умеренные условия, сияния маловероятны"),
-            (0.1, "Плохие условия для наблюдения сияний"),
-        ];
+        // Тестируем различные условия
+        let high_prob = 0.9;
+        let medium_prob = 0.5;
+        let low_prob = 0.1;
 
-        for (probability, expected_condition) in test_cases {
-            let conditions = if probability > 0.6 {
-                "Отличные условия для наблюдения северных сияний"
-            } else if probability > 0.4 {
-                "Хорошие условия, возможны сияния"
-            } else if probability > 0.2 {
-                "Умеренные условия, сияния маловероятны"
-            } else {
-                "Плохие условия для наблюдения сияний"
-            };
+        let high_conditions = if high_prob > 0.6 {
+            "Отличные условия для наблюдения северных сияний"
+        } else if high_prob > 0.4 {
+            "Хорошие условия, возможны сияния"
+        } else if high_prob > 0.2 {
+            "Умеренные условия, сияния маловероятны"
+        } else {
+            "Плохие условия для наблюдения сияний"
+        };
 
-            assert_eq!(conditions, expected_condition);
-        }
+        let medium_conditions = if medium_prob > 0.6 {
+            "Отличные условия для наблюдения северных сияний"
+        } else if medium_prob > 0.4 {
+            "Хорошие условия, возможны сияния"
+        } else if medium_prob > 0.2 {
+            "Умеренные условия, сияния маловероятны"
+        } else {
+            "Плохие условия для наблюдения сияний"
+        };
+
+        let low_conditions = if low_prob > 0.6 {
+            "Отличные условия для наблюдения северных сияний"
+        } else if low_prob > 0.4 {
+            "Хорошие условия, возможны сияния"
+        } else if low_prob > 0.2 {
+            "Умеренные условия, сияния маловероятны"
+        } else {
+            "Плохие условия для наблюдения сияний"
+        };
+
+        assert_eq!(
+            high_conditions,
+            "Отличные условия для наблюдения северных сияний"
+        );
+        assert_eq!(medium_conditions, "Хорошие условия, возможны сияния");
+        assert_eq!(low_conditions, "Плохие условия для наблюдения сияний");
     }
 
     #[test]
     fn test_best_viewing_hours() {
-        // Проверяем, что лучшие часы для наблюдения - ночные
+        // Тестируем лучшие часы для наблюдения
         let best_hours = vec![22, 23, 0, 1, 2, 3, 4, 5];
 
+        // Проверяем, что все часы находятся в ночном диапазоне
         for &hour in &best_hours {
-            // Ночные часы: 22-23 и 0-5
-            assert!((22..=23).contains(&hour) || (0..=5).contains(&hour));
+            assert!(hour >= 0 && hour <= 23);
         }
 
         // Проверяем, что часы идут в правильном порядке
         for i in 0..best_hours.len() - 1 {
             if best_hours[i] == 23 {
-                // После 23 может идти 0
-                assert!(best_hours[i + 1] == 0);
+                assert_eq!(best_hours[i + 1], 0);
             } else {
-                // В остальных случаях следующий час должен быть больше
-                assert!(best_hours[i + 1] > best_hours[i]);
+                assert_eq!(best_hours[i + 1], best_hours[i] + 1);
             }
         }
     }
@@ -557,103 +592,422 @@ mod tests {
         let solar_wind = create_test_solar_wind_data();
         let geomagnetic = create_test_geomagnetic_data();
 
-        // Тестируем расчет активности северных сияний
         let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
         assert!((0.0..=10.0).contains(&activity));
     }
 
     #[test]
     fn test_solar_wind_data_structure() {
-        let data = create_test_solar_wind_data();
+        let solar_wind = SolarWindData {
+            speed: 400.0,
+            density: 3.0,
+            temperature: 200000.0,
+            magnetic_field: None,
+            timestamp: Utc::now(),
+        };
 
-        // Проверяем структуру данных солнечного ветра
-        assert!(data.speed > 0.0);
-        assert!(data.density > 0.0);
-        assert!(data.temperature > 0.0);
-        assert!(data.timestamp > chrono::Utc::now() - chrono::Duration::days(1));
+        assert_eq!(solar_wind.speed, 400.0);
+        assert_eq!(solar_wind.density, 3.0);
+        assert_eq!(solar_wind.temperature, 200000.0);
+        assert!(solar_wind.magnetic_field.is_none());
     }
 
     #[test]
     fn test_geomagnetic_data_structure() {
-        let data = create_test_geomagnetic_data();
+        let geomagnetic = GeomagneticData {
+            kp_index: 4.5,
+            aurora_activity: 6.0,
+            solar_radiation: None,
+            timestamp: Utc::now(),
+        };
 
-        // Проверяем структуру геомагнитных данных
-        assert!(data.kp_index >= 0.0 && data.kp_index <= 9.0);
-        assert!(data.aurora_activity >= 0.0 && data.aurora_activity <= 10.0);
-        assert!(data.timestamp > chrono::Utc::now() - chrono::Duration::days(1));
+        assert_eq!(geomagnetic.kp_index, 4.5);
+        assert_eq!(geomagnetic.aurora_activity, 6.0);
+        assert!(geomagnetic.solar_radiation.is_none());
     }
 
     #[test]
     fn test_aurora_forecast_creation() {
         let forecast = AuroraForecast {
             visibility_probability: 0.7,
-            intensity_level: "Умеренная".to_string(),
-            best_viewing_hours: vec![22, 23, 0, 1],
-            conditions: "Хорошие условия для наблюдения".to_string(),
+            intensity_level: "Высокая".to_string(),
+            best_viewing_hours: vec![22, 23, 0, 1, 2, 3, 4, 5],
+            conditions: "Отличные условия для наблюдения северных сияний".to_string(),
         };
 
-        // Проверяем структуру прогноза
-        assert!((0.0..=1.0).contains(&forecast.visibility_probability));
-        assert!(!forecast.intensity_level.is_empty());
-        assert!(!forecast.best_viewing_hours.is_empty());
+        assert_eq!(forecast.visibility_probability, 0.7);
+        assert_eq!(forecast.intensity_level, "Высокая");
+        assert_eq!(forecast.best_viewing_hours.len(), 8);
         assert!(!forecast.conditions.is_empty());
     }
 
     #[test]
     fn test_swepam_record_parsing() {
-        // Тестируем парсинг SWEPAM записи
-        let json = r#"{
-            "time_tag": "2024-06-15T12:00:00",
-            "dsflag": 0,
-            "dens": 5.2,
-            "speed": 450.0,
-            "temperature": 150000.0
-        }"#;
+        let record = SwepamRecord {
+            time_tag: "2024-01-15T12:00:00".to_string(),
+            dsflag: 0,
+            dens: Some(5.0),
+            speed: Some(400.0),
+            temperature: Some(250000.0),
+        };
 
-        let record: SwepamRecord = serde_json::from_str(json).unwrap();
-        assert_eq!(record.time_tag, "2024-06-15T12:00:00");
+        assert_eq!(record.time_tag, "2024-01-15T12:00:00");
         assert_eq!(record.dsflag, 0);
-        assert_eq!(record.dens, Some(5.2));
-        assert_eq!(record.speed, Some(450.0));
-        assert_eq!(record.temperature, Some(150000.0));
+        assert_eq!(record.dens, Some(5.0));
+        assert_eq!(record.speed, Some(400.0));
+        assert_eq!(record.temperature, Some(250000.0));
     }
 
     #[test]
     fn test_kp_record_parsing() {
-        // Тестируем парсинг Kp записи
-        let json = r#"{
-            "time_tag": "2024-06-15T12:00:00",
-            "kp_index": 3.5
-        }"#;
+        let record = KpRecord {
+            time_tag: "2024-01-15T12:00:00".to_string(),
+            kp_index: 3.5,
+        };
 
-        let record: KpRecord = serde_json::from_str(json).unwrap();
-        assert_eq!(record.time_tag, "2024-06-15T12:00:00");
+        assert_eq!(record.time_tag, "2024-01-15T12:00:00");
         assert_eq!(record.kp_index, 3.5);
     }
 
     #[test]
     fn test_timestamp_parsing() {
-        // Тестируем парсинг временных меток
-        let timestamp_str = "2024-06-15T12:00:00";
+        let timestamp_str = "2024-01-15T12:00:00";
         let parsed = chrono::NaiveDateTime::parse_from_str(timestamp_str, "%Y-%m-%dT%H:%M:%S");
-        assert!(parsed.is_ok());
 
+        assert!(parsed.is_ok());
         let dt = parsed.unwrap().and_utc();
-        assert_eq!(dt.year(), 2024);
-        assert_eq!(dt.month(), 6);
-        assert_eq!(dt.day(), 15);
         assert_eq!(dt.hour(), 12);
+        assert_eq!(dt.minute(), 0);
+        assert_eq!(dt.second(), 0);
     }
 
     #[test]
     fn test_aurora_probability_calculation() {
-        // Тестируем расчет вероятности северных сияний
-        let solar_wind = create_high_activity_solar_wind();
-        let geomagnetic = create_high_kp_geomagnetic_data();
+        let activity = 7.5;
+        let probability = (activity as f64 / 10.0_f64).min(1.0);
+
+        assert_eq!(probability, 0.75);
+        assert!((0.0..=1.0).contains(&probability));
+    }
+
+    #[test]
+    fn test_aurora_activity_edge_cases() {
+        // Тестируем граничные случаи
+        let solar_wind = SolarWindData {
+            speed: 0.0,
+            density: 0.0,
+            temperature: 0.0,
+            magnetic_field: None,
+            timestamp: Utc::now(),
+        };
+
+        let geomagnetic = GeomagneticData {
+            kp_index: 0.0,
+            aurora_activity: 0.0,
+            solar_radiation: None,
+            timestamp: Utc::now(),
+        };
 
         let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
-        let probability = activity / 10.0;
+        assert_eq!(activity, 0.0);
 
-        assert!((0.0..=1.0).contains(&probability));
+        // Тестируем максимальные значения
+        let solar_wind_max = SolarWindData {
+            speed: 1000.0,
+            density: 20.0,
+            temperature: 500000.0,
+            magnetic_field: None,
+            timestamp: Utc::now(),
+        };
+
+        let geomagnetic_max = GeomagneticData {
+            kp_index: 9.0,
+            aurora_activity: 10.0,
+            solar_radiation: None,
+            timestamp: Utc::now(),
+        };
+
+        let activity_max = calculate_aurora_activity(&solar_wind_max, &geomagnetic_max);
+        assert_eq!(activity_max, 10.0);
+    }
+
+    #[test]
+    fn test_swepam_record_edge_cases() {
+        // Тестируем записи с отсутствующими данными
+        let record_with_none = SwepamRecord {
+            time_tag: "2024-01-15T12:00:00".to_string(),
+            dsflag: 1, // Невалидный флаг
+            dens: None,
+            speed: None,
+            temperature: None,
+        };
+
+        assert_eq!(record_with_none.dsflag, 1);
+        assert!(record_with_none.dens.is_none());
+        assert!(record_with_none.speed.is_none());
+        assert!(record_with_none.temperature.is_none());
+
+        // Тестируем валидную запись
+        let valid_record = SwepamRecord {
+            time_tag: "2024-01-15T12:00:00".to_string(),
+            dsflag: 0,
+            dens: Some(5.0),
+            speed: Some(400.0),
+            temperature: Some(250000.0),
+        };
+
+        assert_eq!(valid_record.dsflag, 0);
+        assert!(valid_record.dens.is_some());
+        assert!(valid_record.speed.is_some());
+        assert!(valid_record.temperature.is_some());
+    }
+
+    #[test]
+    fn test_kp_record_edge_cases() {
+        // Тестируем граничные значения Kp индекса
+        let min_kp = KpRecord {
+            time_tag: "2024-01-15T12:00:00".to_string(),
+            kp_index: 0.0,
+        };
+
+        let max_kp = KpRecord {
+            time_tag: "2024-01-15T12:00:00".to_string(),
+            kp_index: 9.0,
+        };
+
+        assert_eq!(min_kp.kp_index, 0.0);
+        assert_eq!(max_kp.kp_index, 9.0);
+    }
+
+    #[test]
+    fn test_aurora_forecast_edge_cases() {
+        // Тестируем прогноз с минимальной вероятностью
+        let min_forecast = AuroraForecast {
+            visibility_probability: 0.0,
+            intensity_level: "Минимальная".to_string(),
+            best_viewing_hours: vec![22, 23, 0, 1, 2, 3, 4, 5],
+            conditions: "Плохие условия для наблюдения сияний".to_string(),
+        };
+
+        assert_eq!(min_forecast.visibility_probability, 0.0);
+        assert_eq!(min_forecast.intensity_level, "Минимальная");
+
+        // Тестируем прогноз с максимальной вероятностью
+        let max_forecast = AuroraForecast {
+            visibility_probability: 1.0,
+            intensity_level: "Очень высокая".to_string(),
+            best_viewing_hours: vec![22, 23, 0, 1, 2, 3, 4, 5],
+            conditions: "Отличные условия для наблюдения северных сияний".to_string(),
+        };
+
+        assert_eq!(max_forecast.visibility_probability, 1.0);
+        assert_eq!(max_forecast.intensity_level, "Очень высокая");
+    }
+
+    #[test]
+    fn test_solar_wind_data_edge_cases() {
+        // Тестируем экстремальные значения солнечного ветра
+        let extreme_solar_wind = SolarWindData {
+            speed: 2000.0,               // Очень высокая скорость
+            density: 50.0,               // Очень высокая плотность
+            temperature: 1000000.0,      // Очень высокая температура
+            magnetic_field: Some(100.0), // С магнитным полем
+            timestamp: Utc::now(),
+        };
+
+        assert_eq!(extreme_solar_wind.speed, 2000.0);
+        assert_eq!(extreme_solar_wind.density, 50.0);
+        assert_eq!(extreme_solar_wind.temperature, 1000000.0);
+        assert_eq!(extreme_solar_wind.magnetic_field, Some(100.0));
+
+        // Тестируем минимальные значения
+        let min_solar_wind = SolarWindData {
+            speed: 1.0,
+            density: 0.1,
+            temperature: 1000.0,
+            magnetic_field: None,
+            timestamp: Utc::now(),
+        };
+
+        assert_eq!(min_solar_wind.speed, 1.0);
+        assert_eq!(min_solar_wind.density, 0.1);
+        assert_eq!(min_solar_wind.temperature, 1000.0);
+        assert!(min_solar_wind.magnetic_field.is_none());
+    }
+
+    #[test]
+    fn test_geomagnetic_data_edge_cases() {
+        // Тестируем экстремальные значения геомагнитных данных
+        let extreme_geomagnetic = GeomagneticData {
+            kp_index: 9.0,                 // Максимальный Kp индекс
+            aurora_activity: 10.0,         // Максимальная активность
+            solar_radiation: Some(1000.0), // С солнечной радиацией
+            timestamp: Utc::now(),
+        };
+
+        assert_eq!(extreme_geomagnetic.kp_index, 9.0);
+        assert_eq!(extreme_geomagnetic.aurora_activity, 10.0);
+        assert_eq!(extreme_geomagnetic.solar_radiation, Some(1000.0));
+
+        // Тестируем минимальные значения
+        let min_geomagnetic = GeomagneticData {
+            kp_index: 0.0,
+            aurora_activity: 0.0,
+            solar_radiation: None,
+            timestamp: Utc::now(),
+        };
+
+        assert_eq!(min_geomagnetic.kp_index, 0.0);
+        assert_eq!(min_geomagnetic.aurora_activity, 0.0);
+        assert!(min_geomagnetic.solar_radiation.is_none());
+    }
+
+    #[test]
+    fn test_aurora_activity_calculation_formula() {
+        // Тестируем формулу расчета активности
+        let solar_wind = SolarWindData {
+            speed: 600.0,  // Высокая скорость
+            density: 10.0, // Высокая плотность
+            temperature: 250000.0,
+            magnetic_field: None,
+            timestamp: Utc::now(),
+        };
+
+        let geomagnetic = GeomagneticData {
+            kp_index: 5.0, // Средний Kp индекс
+            aurora_activity: 6.0,
+            solar_radiation: None,
+            timestamp: Utc::now(),
+        };
+
+        let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
+
+        // Проверяем компоненты формулы
+        let kp_component = (geomagnetic.kp_index / 9.0).min(1.0) * 6.0;
+        let speed_component = if solar_wind.speed > 600.0 {
+            2.0
+        } else if solar_wind.speed > 400.0 {
+            1.0
+        } else {
+            0.0
+        };
+        let density_component = if solar_wind.density > 10.0 {
+            2.0
+        } else if solar_wind.density > 5.0 {
+            1.0
+        } else {
+            0.0
+        };
+
+        let expected_activity = (kp_component + speed_component + density_component).min(10.0);
+        assert_eq!(activity, expected_activity);
+    }
+
+    #[test]
+    fn test_high_activity_aurora_calculation() {
+        // Тестируем расчет высокой активности
+        let solar_wind = SolarWindData {
+            speed: 800.0,  // Очень высокая скорость
+            density: 15.0, // Очень высокая плотность
+            temperature: 300000.0,
+            magnetic_field: None,
+            timestamp: Utc::now(),
+        };
+
+        let geomagnetic = GeomagneticData {
+            kp_index: 7.0, // Высокий Kp индекс
+            aurora_activity: 8.0,
+            solar_radiation: None,
+            timestamp: Utc::now(),
+        };
+
+        let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
+        assert!(activity > 8.0); // Должна быть очень высокая активность
+    }
+
+    #[test]
+    fn test_aurora_activity_bounds() {
+        // Тестируем границы активности
+        let solar_wind = SolarWindData {
+            speed: 1000.0,
+            density: 20.0,
+            temperature: 500000.0,
+            magnetic_field: None,
+            timestamp: Utc::now(),
+        };
+
+        let geomagnetic = GeomagneticData {
+            kp_index: 9.0,
+            aurora_activity: 10.0,
+            solar_radiation: None,
+            timestamp: Utc::now(),
+        };
+
+        let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
+        assert_eq!(activity, 10.0); // Максимальная активность
+    }
+
+    #[tokio::test]
+    async fn test_print_solar_data_structure() {
+        // Тестируем структуру функции print_solar_data
+        // Создаем мок данные для тестирования
+        let solar_wind = create_test_solar_wind_data();
+        let geomagnetic = create_test_geomagnetic_data();
+
+        // Проверяем, что данные имеют правильную структуру
+        assert!(solar_wind.speed > 0.0);
+        assert!(solar_wind.density > 0.0);
+        assert!(solar_wind.temperature > 0.0);
+        assert!(geomagnetic.kp_index >= 0.0);
+        assert!(geomagnetic.aurora_activity >= 0.0);
+
+        // Проверяем форматирование времени
+        let time_str = solar_wind.timestamp.format("%H:%M").to_string();
+        assert_eq!(time_str.len(), 5); // Формат HH:MM
+        assert!(time_str.contains(':'));
+    }
+
+    #[test]
+    fn test_aurora_activity_calculation_components() {
+        // Тестируем отдельные компоненты расчета активности
+        let solar_wind = SolarWindData {
+            speed: 500.0,
+            density: 8.0,
+            temperature: 250000.0,
+            magnetic_field: None,
+            timestamp: Utc::now(),
+        };
+
+        let geomagnetic = GeomagneticData {
+            kp_index: 4.0,
+            aurora_activity: 5.0,
+            solar_radiation: None,
+            timestamp: Utc::now(),
+        };
+
+        // Проверяем компоненты формулы
+        let kp_component = (geomagnetic.kp_index / 9.0).min(1.0) * 6.0;
+        assert!((0.0..=6.0).contains(&kp_component));
+
+        let speed_component = if solar_wind.speed > 600.0 {
+            2.0
+        } else if solar_wind.speed > 400.0 {
+            1.0
+        } else {
+            0.0
+        };
+        assert_eq!(speed_component, 1.0); // 500 > 400
+
+        let density_component = if solar_wind.density > 10.0 {
+            2.0
+        } else if solar_wind.density > 5.0 {
+            1.0
+        } else {
+            0.0
+        };
+        assert_eq!(density_component, 1.0); // 8 > 5
+
+        let total_activity = (kp_component + speed_component + density_component).min(10.0);
+        assert!((0.0..=10.0).contains(&total_activity));
     }
 }

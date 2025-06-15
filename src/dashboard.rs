@@ -259,7 +259,10 @@ mod tests {
     fn create_test_date() -> DateTime<Local> {
         // Используем фиксированную дату для тестов
         let naive_date = NaiveDate::from_ymd_opt(2024, 6, 15).unwrap();
-        let naive_datetime = NaiveDateTime::new(naive_date, chrono::NaiveTime::from_hms_opt(12, 0, 0).unwrap());
+        let naive_datetime = NaiveDateTime::new(
+            naive_date,
+            chrono::NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+        );
         Local.from_local_datetime(&naive_datetime).unwrap()
     }
 
@@ -281,10 +284,10 @@ mod tests {
             55.7558,
             37.6176,
         );
-        
+
         let golden_hour_info = create_test_golden_hour_info();
         let test_date = create_test_date();
-        
+
         // В обычное время не должно быть золотого часа
         let _is_golden = _dashboard.is_golden_hour_today(&golden_hour_info, test_date);
         // Этот тест может быть нестабильным из-за реального времени, поэтому проверяем только логику
@@ -298,13 +301,13 @@ mod tests {
             55.7558,
             37.6176,
         );
-        
+
         // Тестируем разные сценарии
         let excellent = dashboard.determine_overall_recommendation(9.0, true);
         let good = dashboard.determine_overall_recommendation(7.5, false);
         let moderate = dashboard.determine_overall_recommendation(5.5, false);
         let poor = dashboard.determine_overall_recommendation(3.0, false);
-        
+
         // Проверяем, что рекомендации содержат ожидаемые ключевые слова
         assert!(excellent.contains("Отличный") || excellent.contains("Идеальные"));
         assert!(good.contains("Хороший") || good.contains("благоприятны"));
@@ -320,11 +323,11 @@ mod tests {
             55.7558,
             37.6176,
         );
-        
+
         let weather_analysis = create_test_weather_analysis();
         let golden_hour_info = create_test_golden_hour_info();
         let test_date = create_test_date();
-        
+
         let summary = dashboard.create_summary(
             &weather_analysis,
             &golden_hour_info,
@@ -332,7 +335,7 @@ mod tests {
             test_date,
             0.3, // 30% вероятность сияний
         );
-        
+
         // Проверяем структуру сводки
         assert_eq!(summary.weather_score, 7.5);
         assert_eq!(summary.aurora_probability, 0.3);
@@ -349,13 +352,13 @@ mod tests {
             55.7558,
             37.6176,
         );
-        
+
         let mut excellent_weather = create_test_weather_analysis();
         excellent_weather.overall_score = 9.0;
-        
+
         let golden_hour_info = create_test_golden_hour_info();
         let test_date = create_test_date();
-        
+
         let summary = dashboard.create_summary(
             &excellent_weather,
             &golden_hour_info,
@@ -363,12 +366,14 @@ mod tests {
             test_date,
             0.8, // высокая вероятность сияний
         );
-        
+
         // При отличных условиях должны быть highlights
         assert!(!summary.key_highlights.is_empty());
-        
+
         // Проверяем, что есть упоминание отличных условий
-        let has_excellent_highlight = summary.key_highlights.iter()
+        let has_excellent_highlight = summary
+            .key_highlights
+            .iter()
             .any(|highlight| highlight.contains("Отличные"));
         assert!(has_excellent_highlight);
     }
@@ -381,26 +386,23 @@ mod tests {
             55.7558,
             37.6176,
         );
-        
+
         let mut poor_weather = create_test_weather_analysis();
         poor_weather.overall_score = 3.0;
-        
+
         let golden_hour_info = create_test_golden_hour_info();
         let test_date = create_test_date();
-        
-        let summary = dashboard.create_summary(
-            &poor_weather,
-            &golden_hour_info,
-            false,
-            test_date,
-            0.1,
-        );
-        
+
+        let summary =
+            dashboard.create_summary(&poor_weather, &golden_hour_info, false, test_date, 0.1);
+
         // При плохих условиях должны быть предупреждения
         assert!(!summary.warnings.is_empty());
-        
+
         // Проверяем, что есть упоминание неидеальных условий
-        let has_warning = summary.warnings.iter()
+        let has_warning = summary
+            .warnings
+            .iter()
             .any(|warning| warning.contains("не идеальны"));
         assert!(has_warning);
     }
@@ -416,13 +418,13 @@ mod tests {
             key_highlights: vec!["Отличные условия".to_string()],
             warnings: vec![],
         };
-        
+
         // Проверяем разумные пределы
         assert!(summary.weather_score >= 0.0 && summary.weather_score <= 10.0);
         assert!(summary.aurora_probability >= 0.0 && summary.aurora_probability <= 1.0);
         assert!(!summary.overall_recommendation.is_empty());
         assert!(!summary.best_shooting_hours.is_empty());
-        
+
         // Проверяем, что лучшие часы в разумных пределах
         for &hour in &summary.best_shooting_hours {
             assert!((0..=23).contains(&hour));
@@ -437,19 +439,21 @@ mod tests {
             55.7558,
             37.6176,
         );
-        
+
         // Тестируем граничные значения
         let min_recommendation = dashboard.determine_overall_recommendation(0.0, false);
         let max_recommendation = dashboard.determine_overall_recommendation(10.0, true);
-        
+
         assert!(!min_recommendation.is_empty());
         assert!(!max_recommendation.is_empty());
-        
+
         // Проверяем, что при минимальных значениях есть рекомендация о переносе
         assert!(min_recommendation.contains("перенести") || min_recommendation.contains("Сложные"));
-        
+
         // Проверяем, что при максимальных значениях есть положительная рекомендация
-        assert!(max_recommendation.contains("Отличный") || max_recommendation.contains("Идеальные"));
+        assert!(
+            max_recommendation.contains("Отличный") || max_recommendation.contains("Идеальные")
+        );
     }
 
     #[test]
@@ -460,28 +464,18 @@ mod tests {
             55.7558,
             37.6176,
         );
-        
+
         let weather_analysis = create_test_weather_analysis();
         let golden_hour_info = create_test_golden_hour_info();
         let test_date = create_test_date();
-        
+
         // Тестируем разные значения вероятности сияний
-        let summary_low = dashboard.create_summary(
-            &weather_analysis,
-            &golden_hour_info,
-            false,
-            test_date,
-            0.0,
-        );
-        
-        let summary_high = dashboard.create_summary(
-            &weather_analysis,
-            &golden_hour_info,
-            false,
-            test_date,
-            1.0,
-        );
-        
+        let summary_low =
+            dashboard.create_summary(&weather_analysis, &golden_hour_info, false, test_date, 0.0);
+
+        let summary_high =
+            dashboard.create_summary(&weather_analysis, &golden_hour_info, false, test_date, 1.0);
+
         assert_eq!(summary_low.aurora_probability, 0.0);
         assert_eq!(summary_high.aurora_probability, 1.0);
     }

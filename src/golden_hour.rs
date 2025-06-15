@@ -135,7 +135,7 @@ pub fn print_golden_hour_info(service: &GoldenHourService) {
         info.blue_hour_evening_start.format("%H:%M"),
         info.blue_hour_evening_end.format("%H:%M")
     );
-    
+
     println!("💡 Текущие условия освещения: {}", current_condition);
 }
 

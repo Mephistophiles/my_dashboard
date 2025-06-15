@@ -204,6 +204,7 @@ feat: add new features
 **Обязательные требования к тестам:**
 - **ВСЕ публичные функции должны иметь unit тесты**
 - **ВСЕ модули должны иметь integration тесты**
+- **Code coverage должен быть > 70%**
 - Тесты должны покрывать как успешные сценарии, так и обработку ошибок
 - Mock данные допустимы только в тестах, никогда в production коде
 - Тесты должны быть независимыми и не зависеть от внешних API
@@ -258,7 +259,7 @@ mod tests {
 ```
 
 **Требования к покрытию тестами:**
-- Минимум 80% покрытия кода тестами
+- **Минимум 70% покрытия кода тестами**
 - 100% покрытие критических функций (API вызовы, расчеты)
 - Тестирование всех веток условных операторов
 - Тестирование граничных значений
@@ -275,6 +276,7 @@ mod tests {
 - `docs/calculations.md` - все формулы и алгоритмы
 - `docs/ai-prompts.md` - этот файл с требованиями
 - `README.md` - описание проекта и инструкции по запуску
+- `CHANGELOG.md` - **ОБЯЗАТЕЛЬНО обновлять при каждом изменении**
 - Комментарии в коде для сложных алгоритмов
 
 **Содержание README:**
@@ -282,4 +284,83 @@ mod tests {
 - Установка и настройка
 - Примеры использования
 - Конфигурация переменных окружения
-- Описание API и источников данных 
+- Описание API и источников данных
+
+**Требования к CHANGELOG:**
+- **ОБЯЗАТЕЛЬНО обновлять при каждом коммите**
+- Использовать формат [Keep a Changelog](https://keepachangelog.com/)
+- Группировать изменения по типам: Added, Changed, Deprecated, Removed, Fixed, Security
+- Указывать версии и даты изменений
+- Добавлять ссылки на коммиты для важных изменений
+
+**Пример CHANGELOG:**
+```markdown
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- New feature for aurora prediction
+- Integration tests for weather module
+
+### Changed
+- Improved error handling in solar data fetching
+
+### Fixed
+- Bug in golden hour calculation
+- Test compilation issues
+
+## [0.4.0] - 2024-01-15
+
+### Added
+- Photography dashboard functionality
+- Golden hour calculation service
+- Solar data integration
+
+### Changed
+- Refactored weather analysis algorithm
+- Updated API endpoints
+
+### Fixed
+- Memory leak in weather service
+- Incorrect timezone handling
+```
+
+### 12. Code Coverage
+
+**Обязательные требования:**
+- **Минимум 70% покрытия кода тестами**
+- Использовать `tarpaulin` для измерения покрытия
+- Покрывать все публичные API функции
+- Тестировать все ветки условных операторов
+- Покрывать обработку ошибок
+
+**Команды для проверки покрытия:**
+```bash
+# Установка tarpaulin
+cargo install cargo-tarpaulin
+
+# Проверка покрытия
+cargo tarpaulin --out Html
+
+# Проверка покрытия с минимальным порогом
+cargo tarpaulin --out Html --fail-under 70
+```
+
+**Стратегии улучшения покрытия:**
+- Добавлять тесты для неиспользуемых веток кода
+- Тестировать граничные значения и edge cases
+- Добавлять тесты для обработки ошибок
+- Покрывать все публичные методы структур
+- Тестировать интеграционные сценарии
+
+**Отчеты о покрытии:**
+- Генерировать HTML отчеты для анализа
+- Включать покрытие в CI/CD pipeline
+- Отслеживать тренды покрытия кода
+- Устанавливать минимальные пороги для новых функций

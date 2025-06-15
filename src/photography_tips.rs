@@ -126,6 +126,12 @@ impl PhotographyTipsService {
     }
 }
 
+impl Default for PhotographyTipsService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn print_photography_tips(tips: &[String]) {
     for (i, tip) in tips.iter().enumerate() {
         println!("{}. {}", i + 1, tip);
@@ -145,7 +151,7 @@ mod tests {
     fn test_get_tips_for_weather_good_conditions() {
         let service = PhotographyTipsService::new();
         let tips = service.get_tips_for_weather(8.0, true, 0.7);
-        
+
         // При хороших условиях должны быть рекомендации
         assert!(!tips.equipment_recommendations.is_empty());
         assert!(!tips.shooting_tips.is_empty());
@@ -157,14 +163,18 @@ mod tests {
     fn test_get_tips_for_weather_bad_conditions() {
         let service = PhotographyTipsService::new();
         let tips = service.get_tips_for_weather(3.0, false, 0.1);
-        
+
         // При плохих условиях должны быть рекомендации по защите
-        let has_protection_tips = tips.equipment_recommendations.iter()
+        let has_protection_tips = tips
+            .equipment_recommendations
+            .iter()
             .any(|tip| tip.contains("защиту") || tip.contains("штатив"));
         assert!(has_protection_tips);
-        
+
         // При низкой вероятности сияний не должно быть рекомендаций по ним
-        let has_aurora_tips = tips.equipment_recommendations.iter()
+        let has_aurora_tips = tips
+            .equipment_recommendations
+            .iter()
             .any(|tip| tip.contains("широкоугольный"));
         assert!(!has_aurora_tips);
     }
@@ -173,21 +183,29 @@ mod tests {
     fn test_get_tips_for_weather_golden_hour_only() {
         let service = PhotographyTipsService::new();
         let tips = service.get_tips_for_weather(6.0, true, 0.1);
-        
+
         // Проверяем рекомендации для золотого часа
-        let has_golden_hour_equipment = tips.equipment_recommendations.iter()
+        let has_golden_hour_equipment = tips
+            .equipment_recommendations
+            .iter()
             .any(|tip| tip.contains("фильтр"));
         assert!(has_golden_hour_equipment);
-        
-        let has_golden_hour_shooting = tips.shooting_tips.iter()
+
+        let has_golden_hour_shooting = tips
+            .shooting_tips
+            .iter()
             .any(|tip| tip.contains("теплые тона"));
         assert!(has_golden_hour_shooting);
-        
-        let has_golden_hour_locations = tips.location_suggestions.iter()
+
+        let has_golden_hour_locations = tips
+            .location_suggestions
+            .iter()
             .any(|tip| tip.contains("парки") || tip.contains("набережные"));
         assert!(has_golden_hour_locations);
-        
-        let has_golden_hour_settings = tips.technical_settings.iter()
+
+        let has_golden_hour_settings = tips
+            .technical_settings
+            .iter()
             .any(|tip| tip.contains("f/8") || tip.contains("f/16"));
         assert!(has_golden_hour_settings);
     }
@@ -196,21 +214,29 @@ mod tests {
     fn test_get_tips_for_weather_aurora_only() {
         let service = PhotographyTipsService::new();
         let tips = service.get_tips_for_weather(6.0, false, 0.8);
-        
+
         // Проверяем рекомендации для северных сияний
-        let has_aurora_equipment = tips.equipment_recommendations.iter()
+        let has_aurora_equipment = tips
+            .equipment_recommendations
+            .iter()
             .any(|tip| tip.contains("Широкоугольный"));
         assert!(has_aurora_equipment);
-        
-        let has_aurora_shooting = tips.shooting_tips.iter()
+
+        let has_aurora_shooting = tips
+            .shooting_tips
+            .iter()
             .any(|tip| tip.contains("длинные выдержки"));
         assert!(has_aurora_shooting);
-        
-        let has_aurora_locations = tips.location_suggestions.iter()
+
+        let has_aurora_locations = tips
+            .location_suggestions
+            .iter()
             .any(|tip| tip.contains("город") || tip.contains("открытые пространства"));
         assert!(has_aurora_locations);
-        
-        let has_aurora_settings = tips.technical_settings.iter()
+
+        let has_aurora_settings = tips
+            .technical_settings
+            .iter()
             .any(|tip| tip.contains("15-30 секунд"));
         assert!(has_aurora_settings);
     }
@@ -219,13 +245,17 @@ mod tests {
     fn test_get_tips_for_weather_excellent_conditions() {
         let service = PhotographyTipsService::new();
         let tips = service.get_tips_for_weather(9.0, false, 0.1);
-        
+
         // При отличных условиях должны быть соответствующие советы (weather_score >= 7.0)
-        let has_excellent_tips = tips.shooting_tips.iter()
+        let has_excellent_tips = tips
+            .shooting_tips
+            .iter()
             .any(|tip| tip.contains("Отличные условия"));
         assert!(has_excellent_tips);
-        
-        let has_experiment_tips = tips.shooting_tips.iter()
+
+        let has_experiment_tips = tips
+            .shooting_tips
+            .iter()
             .any(|tip| tip.contains("экспериментируйте"));
         assert!(has_experiment_tips);
     }
@@ -234,21 +264,27 @@ mod tests {
     fn test_get_tips_for_weather_all_conditions() {
         let service = PhotographyTipsService::new();
         let tips = service.get_tips_for_weather(8.0, true, 0.8);
-        
+
         // При всех благоприятных условиях должно быть много рекомендаций
         assert!(tips.equipment_recommendations.len() >= 4);
         assert!(tips.shooting_tips.len() >= 4);
         assert!(tips.location_suggestions.len() >= 3);
         assert!(tips.technical_settings.len() >= 4);
-        
+
         // Проверяем наличие всех типов рекомендаций
-        let has_golden_hour_tips = tips.equipment_recommendations.iter()
+        let has_golden_hour_tips = tips
+            .equipment_recommendations
+            .iter()
             .any(|tip| tip.contains("фильтр"));
-        let has_aurora_tips = tips.equipment_recommendations.iter()
+        let has_aurora_tips = tips
+            .equipment_recommendations
+            .iter()
             .any(|tip| tip.contains("Широкоугольный"));
-        let has_excellent_tips = tips.shooting_tips.iter()
+        let has_excellent_tips = tips
+            .shooting_tips
+            .iter()
             .any(|tip| tip.contains("Отличные условия"));
-        
+
         assert!(has_golden_hour_tips);
         assert!(has_aurora_tips);
         assert!(has_excellent_tips);
@@ -258,18 +294,19 @@ mod tests {
     fn test_get_general_recommendations() {
         let service = PhotographyTipsService::new();
         let recommendations = service.get_general_recommendations();
-        
+
         // Должно быть 5 общих рекомендаций
         assert_eq!(recommendations.len(), 5);
-        
+
         // Проверяем наличие ключевых рекомендаций
-        let has_weather_check = recommendations.iter()
+        let has_weather_check = recommendations
+            .iter()
             .any(|rec| rec.contains("прогноз погоды"));
-        let has_planning = recommendations.iter()
-            .any(|rec| rec.contains("Планируйте"));
-        let has_safety = recommendations.iter()
+        let has_planning = recommendations.iter().any(|rec| rec.contains("Планируйте"));
+        let has_safety = recommendations
+            .iter()
             .any(|rec| rec.contains("безопасности"));
-        
+
         assert!(has_weather_check);
         assert!(has_planning);
         assert!(has_safety);
@@ -280,13 +317,13 @@ mod tests {
         let service = PhotographyTipsService::new();
         // Используем параметры, которые гарантированно добавят рекомендации
         let tips = service.get_tips_for_weather(4.0, true, 0.6);
-        
+
         // Проверяем структуру объекта
         assert!(!tips.equipment_recommendations.is_empty());
         assert!(!tips.shooting_tips.is_empty());
         assert!(!tips.location_suggestions.is_empty());
         assert!(!tips.technical_settings.is_empty());
-        
+
         // Проверяем, что все рекомендации не пустые
         for tip in &tips.equipment_recommendations {
             assert!(!tip.is_empty());
@@ -305,16 +342,18 @@ mod tests {
     #[test]
     fn test_edge_cases() {
         let service = PhotographyTipsService::new();
-        
+
         // Тестируем граничные значения
         let tips_min = service.get_tips_for_weather(0.0, false, 0.0);
         let tips_max = service.get_tips_for_weather(10.0, true, 1.0);
-        
+
         // При минимальных значениях должны быть рекомендации по защите
-        let has_protection_min = tips_min.equipment_recommendations.iter()
+        let has_protection_min = tips_min
+            .equipment_recommendations
+            .iter()
             .any(|tip| tip.contains("защиту") || tip.contains("штатив"));
         assert!(has_protection_min);
-        
+
         // При максимальных значениях должно быть много рекомендаций
         assert!(!tips_max.equipment_recommendations.is_empty());
         assert!(!tips_max.shooting_tips.is_empty());
@@ -326,25 +365,36 @@ mod tests {
     fn test_technical_settings_consistency() {
         let service = PhotographyTipsService::new();
         let tips = service.get_tips_for_weather(7.0, true, 0.6);
-        
+
         // Проверяем, что технические настройки содержат разумные значения
         for setting in &tips.technical_settings {
             // Проверяем ISO
             if setting.contains("ISO") {
-                assert!(setting.contains("100") || setting.contains("400") || 
-                       setting.contains("800") || setting.contains("3200"));
+                assert!(
+                    setting.contains("100")
+                        || setting.contains("400")
+                        || setting.contains("800")
+                        || setting.contains("3200")
+                );
             }
-            
+
             // Проверяем диафрагму
             if setting.contains("f/") {
-                assert!(setting.contains("f/2.8") || setting.contains("f/4") || 
-                       setting.contains("f/8") || setting.contains("f/16"));
+                assert!(
+                    setting.contains("f/2.8")
+                        || setting.contains("f/4")
+                        || setting.contains("f/8")
+                        || setting.contains("f/16")
+                );
             }
-            
+
             // Проверяем выдержку
             if setting.contains("секунд") {
-                assert!(setting.contains("1/60") || setting.contains("1/250") || 
-                       setting.contains("15-30"));
+                assert!(
+                    setting.contains("1/60")
+                        || setting.contains("1/250")
+                        || setting.contains("15-30")
+                );
             }
         }
     }
