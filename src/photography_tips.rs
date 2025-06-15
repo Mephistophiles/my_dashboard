@@ -1,18 +1,96 @@
+//! # Photography Tips Module
+//!
+//! Модуль для генерации персонализированных советов по фотографии.
+//! Предоставляет рекомендации по оборудованию, настройкам камеры,
+//! выбору локаций и технике съемки на основе текущих условий.
+//!
+//! ## Основные компоненты
+//!
+//! - [`PhotographyTipsService`] - Сервис для генерации советов
+//! - [`PhotographyTips`] - Структура с рекомендациями
+//!
+//! ## Пример использования
+//!
+//! ```rust
+//! use my_dashboard::photography_tips::PhotographyTipsService;
+//!
+//! // Создаем сервис советов
+//! let service = PhotographyTipsService::new();
+//!
+//! // Получаем персонализированные советы
+//! let tips = service.get_tips_for_weather(8.5, true, 0.7);
+//!
+//! println!("Рекомендации по оборудованию:");
+//! for tip in &tips.equipment_recommendations {
+//!     println!("- {}", tip);
+//! }
+//!
+//! // Получаем общие рекомендации
+//! let general_tips = service.get_general_recommendations();
+//! for tip in &general_tips {
+//!     println!("- {}", tip);
+//! }
+//! ```
+
+/// Структура с рекомендациями по фотографии
+///
+/// Содержит персонализированные советы по оборудованию, съемке,
+/// выбору локаций и техническим настройкам камеры.
 #[derive(Debug)]
 pub struct PhotographyTips {
+    /// Рекомендации по необходимому оборудованию
     pub equipment_recommendations: Vec<String>,
+    /// Советы по технике съемки
     pub shooting_tips: Vec<String>,
+    /// Предложения по выбору локаций
     pub location_suggestions: Vec<String>,
+    /// Рекомендуемые технические настройки камеры
     pub technical_settings: Vec<String>,
 }
 
+/// Сервис для генерации советов по фотографии
+///
+/// Анализирует текущие условия (погода, золотой час, северные сияния)
+/// и генерирует персонализированные рекомендации для фотографов.
 pub struct PhotographyTipsService;
 
 impl PhotographyTipsService {
+    /// Создает новый экземпляр сервиса советов
+    ///
+    /// # Пример
+    ///
+    /// ```rust
+    /// use my_dashboard::photography_tips::PhotographyTipsService;
+    ///
+    /// let service = PhotographyTipsService::new();
+    /// ```
     pub fn new() -> Self {
         Self
     }
 
+    /// Генерирует персонализированные советы на основе текущих условий
+    ///
+    /// # Аргументы
+    ///
+    /// * `weather_score` - Оценка погодных условий (0-10)
+    /// * `is_golden_hour` - Сейчас ли золотой час
+    /// * `aurora_probability` - Вероятность северных сияний (0-1)
+    ///
+    /// # Возвращает
+    ///
+    /// `PhotographyTips` - Структура с рекомендациями
+    ///
+    /// # Пример
+    ///
+    /// ```rust
+    /// use my_dashboard::photography_tips::PhotographyTipsService;
+    ///
+    /// let service = PhotographyTipsService::new();
+    /// let tips = service.get_tips_for_weather(8.5, true, 0.7);
+    ///
+    /// // Проверяем рекомендации по оборудованию
+    /// assert!(!tips.equipment_recommendations.is_empty());
+    /// ```
     pub fn get_tips_for_weather(
         &self,
         weather_score: f64,
@@ -115,6 +193,27 @@ impl PhotographyTipsService {
         tips
     }
 
+    /// Возвращает общие рекомендации по фотографии
+    ///
+    /// Содержит универсальные советы, которые применимы в любых условиях
+    /// и помогут улучшить качество съемки.
+    ///
+    /// # Возвращает
+    ///
+    /// `Vec<String>` - Список общих рекомендаций
+    ///
+    /// # Пример
+    ///
+    /// ```rust
+    /// use my_dashboard::photography_tips::PhotographyTipsService;
+    ///
+    /// let service = PhotographyTipsService::new();
+    /// let general_tips = service.get_general_recommendations();
+    ///
+    /// for tip in &general_tips {
+    ///     println!("- {}", tip);
+    /// }
+    /// ```
     pub fn get_general_recommendations(&self) -> Vec<String> {
         vec![
             "Всегда проверяйте прогноз погоды перед съемкой".to_string(),
@@ -132,6 +231,24 @@ impl Default for PhotographyTipsService {
     }
 }
 
+/// Выводит список советов в консоль с нумерацией
+///
+/// Функция для удобного отображения списка рекомендаций
+/// в пронумерованном виде.
+///
+/// # Аргументы
+///
+/// * `tips` - Список советов для вывода
+///
+/// # Пример
+///
+/// ```rust,no_run
+/// use my_dashboard::photography_tips::{PhotographyTipsService, print_photography_tips};
+///
+/// let service = PhotographyTipsService::new();
+/// let tips = service.get_general_recommendations();
+/// print_photography_tips(&tips);
+/// ```
 pub fn print_photography_tips(tips: &[String]) {
     for (i, tip) in tips.iter().enumerate() {
         println!("{}. {}", i + 1, tip);

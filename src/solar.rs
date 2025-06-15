@@ -1,30 +1,90 @@
+//! # Solar Module
+//!
+//! Модуль для получения данных о солнечной активности и прогнозирования северных сияний.
+//! Предоставляет функциональность для анализа условий астрофотографии.
+//!
+//! ## Основные компоненты
+//!
+//! - [`SolarWindData`] - Данные о солнечном ветре
+//! - [`GeomagneticData`] - Геомагнитные данные
+//! - [`AuroraForecast`] - Прогноз северных сияний
+//!
+//! ## Пример использования
+//!
+//! ```rust,no_run
+//! use my_dashboard::solar::{predict_aurora, fetch_solar_wind_data, fetch_geomagnetic_data};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Получаем прогноз северных сияний
+//!     let forecast = predict_aurora().await?;
+//!     println!("Вероятность северных сияний: {:.1}%",
+//!         forecast.visibility_probability * 100.0);
+//!
+//!     // Получаем данные о солнечном ветре
+//!     let solar_wind = fetch_solar_wind_data().await?;
+//!     println!("Скорость солнечного ветра: {} км/с", solar_wind.speed);
+//!
+//!     // Получаем геомагнитные данные
+//!     let geomagnetic = fetch_geomagnetic_data().await?;
+//!     println!("Kp индекс: {}", geomagnetic.kp_index);
+//!     
+//!     Ok(())
+//! }
+//! ```
+
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+/// Данные о солнечном ветре
+///
+/// Содержит информацию о скорости, плотности и температуре солнечного ветра,
+/// полученную от NOAA SWEPAM API.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SolarWindData {
-    pub speed: f64,                  // км/с
-    pub density: f64,                // частиц/см³
-    pub temperature: f64,            // К
-    pub magnetic_field: Option<f64>, // нТл (недоступно в SWEPAM API)
+    /// Скорость солнечного ветра в км/с
+    pub speed: f64,
+    /// Плотность частиц в частиц/см³
+    pub density: f64,
+    /// Температура в Кельвинах
+    pub temperature: f64,
+    /// Магнитное поле в нТл (недоступно в SWEPAM API)
+    pub magnetic_field: Option<f64>,
+    /// Временная метка данных
     pub timestamp: DateTime<Utc>,
 }
 
+/// Геомагнитные данные
+///
+/// Содержит информацию о геомагнитной активности и Kp индексе,
+/// полученную от NOAA Planetary K-index API.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GeomagneticData {
-    pub kp_index: f64,                // Геомагнитный индекс
-    pub aurora_activity: f64,         // Активность северных сияний (0-10)
-    pub solar_radiation: Option<f64>, // Солнечная радиация (недоступно в Kp API)
+    /// Геомагнитный Kp индекс (0-9)
+    pub kp_index: f64,
+    /// Активность северных сияний (0-10)
+    pub aurora_activity: f64,
+    /// Солнечная радиация (недоступно в Kp API)
+    pub solar_radiation: Option<f64>,
+    /// Временная метка данных
     pub timestamp: DateTime<Utc>,
 }
 
+/// Прогноз северных сияний
+///
+/// Содержит информацию о вероятности появления северных сияний,
+/// уровне интенсивности и лучшем времени для наблюдения.
 #[derive(Debug)]
 pub struct AuroraForecast {
-    pub visibility_probability: f64, // Вероятность видимости северных сияний
-    pub intensity_level: String,     // Уровень интенсивности
-    pub best_viewing_hours: Vec<usize>, // Лучшие часы для наблюдения
-    pub conditions: String,          // Условия для наблюдения
+    /// Вероятность видимости северных сияний (0-1)
+    pub visibility_probability: f64,
+    /// Уровень интенсивности (текстовое описание)
+    pub intensity_level: String,
+    /// Лучшие часы для наблюдения (0-23)
+    pub best_viewing_hours: Vec<usize>,
+    /// Условия для наблюдения
+    pub conditions: String,
 }
 
 // Структуры для парсинга NOAA API
@@ -50,6 +110,24 @@ struct KpRecord {
     kp_index: f64,
 }
 
+/// Получает данные о солнечном ветре от NOAA SWEPAM API
+///
+/// # Возвращает
+///
+/// `Result<SolarWindData>` - Данные о солнечном ветре или ошибка
+///
+/// # Пример
+///
+/// ```rust,no_run
+/// use my_dashboard::solar::fetch_solar_wind_data;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let solar_wind = fetch_solar_wind_data().await?;
+///     println!("Скорость: {} км/с", solar_wind.speed);
+///     Ok(())
+/// }
+/// ```
 pub async fn fetch_solar_wind_data() -> Result<SolarWindData> {
     let url = "https://services.swpc.noaa.gov/json/ace/swepam/ace_swepam_1h.json";
     let response = reqwest::get(url).await?;
