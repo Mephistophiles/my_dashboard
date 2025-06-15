@@ -1,5 +1,4 @@
 use chrono::{DateTime, Datelike, Local, NaiveDate};
-use colored::*;
 use sunrise::{Coordinates, SolarDay, SolarEvent};
 
 #[derive(Debug)]
@@ -110,7 +109,7 @@ impl GoldenHourService {
 }
 
 pub fn print_golden_hour_info(info: &GoldenHourInfo) {
-    print!("Зол.час: {}-{} | Вечер: {}-{} | Син.утро: {}-{} | Син.вечер: {}-{}\n",
+    println!("Зол.час: {}-{} | Вечер: {}-{} | Син.утро: {}-{} | Син.вечер: {}-{}",
         info.golden_hour_morning_start.format("%H:%M"),
         info.golden_hour_morning_end.format("%H:%M"),
         info.golden_hour_evening_start.format("%H:%M"),
