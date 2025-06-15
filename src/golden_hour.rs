@@ -1,6 +1,6 @@
-use chrono::{DateTime, Datelike, Local};
+use chrono::{DateTime, Datelike, Local, NaiveDate};
 use colored::*;
-use sunrise::sunrise_sunset;
+use sunrise::{Coordinates, SolarDay, SolarEvent};
 
 #[derive(Debug)]
 pub struct GoldenHourInfo {
@@ -30,13 +30,23 @@ impl GoldenHourService {
     }
 
     pub fn calculate_golden_hours(&self, date: DateTime<Local>) -> GoldenHourInfo {
-        let (sunrise_timestamp, sunset_timestamp) = sunrise_sunset(
-            self.latitude,
-            self.longitude,
+        // Создаем координаты
+        let coords = Coordinates::new(self.latitude, self.longitude)
+            .expect("Invalid coordinates");
+        
+        // Создаем дату
+        let naive_date = NaiveDate::from_ymd_opt(
             date.year(),
-            date.month() as u32,
-            date.day() as u32,
-        );
+            date.month(),
+            date.day()
+        ).expect("Invalid date");
+        
+        // Создаем солнечный день
+        let solar_day = SolarDay::new(coords, naive_date);
+        
+        // Получаем время восхода и заката
+        let sunrise_timestamp = solar_day.event_time(SolarEvent::Sunrise).timestamp();
+        let sunset_timestamp = solar_day.event_time(SolarEvent::Sunset).timestamp();
 
         let sunrise = DateTime::from_timestamp(sunrise_timestamp, 0)
             .unwrap()

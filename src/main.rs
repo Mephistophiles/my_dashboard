@@ -14,6 +14,9 @@ use weather::{analyze_weather_for_photography, print_weather_analysis, WeatherSe
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Загружаем переменные окружения из файла .env
+    dotenv::dotenv().ok();
+    
     println!("{}", "🚀 Запуск дашборда для фотографов...".bold().blue());
 
     // Параметры (в реальном приложении можно получать из конфигурации)

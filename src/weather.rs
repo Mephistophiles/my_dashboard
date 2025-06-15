@@ -1,6 +1,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use colored::*;
+use reqwest;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -20,6 +21,29 @@ pub struct WeatherForecast {
     pub hourly: Vec<WeatherData>,
 }
 
+// Структуры для парсинга ответа OpenWeatherMap API
+#[derive(Debug, Deserialize)]
+struct OpenWeatherResponse {
+    hourly: Vec<OpenWeatherHourly>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenWeatherHourly {
+    dt: i64,
+    temp: f64,
+    humidity: f64,
+    wind_speed: f64,
+    clouds: f64,
+    visibility: Option<f64>,
+    pop: f64, // probability of precipitation
+    weather: Vec<OpenWeatherCondition>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenWeatherCondition {
+    description: String,
+}
+
 pub struct WeatherService {
     api_key: String,
     city: String,
@@ -31,8 +55,77 @@ impl WeatherService {
     }
 
     pub async fn get_weather_forecast(&self) -> Result<WeatherForecast> {
-        // В реальном приложении здесь был бы вызов API OpenWeatherMap или другого сервиса
-        // Для демонстрации создаем моковые данные
+        // Если используется demo_key, возвращаем моковые данные
+        if self.api_key == "demo_key" {
+            return self.get_mock_forecast();
+        }
+
+        // Получаем координаты города
+        let coords = self.get_city_coordinates().await?;
+        
+        // Получаем прогноз погоды
+        let url = format!(
+            "https://api.openweathermap.org/data/3.0/onecall?lat={}&lon={}&exclude=current,minutely,daily,alerts&units=metric&appid={}",
+            coords.lat, coords.lon, self.api_key
+        );
+
+        let response = reqwest::get(&url).await?;
+        
+        if !response.status().is_success() {
+            eprintln!("Ошибка API: {}", response.status());
+            return self.get_mock_forecast();
+        }
+
+        let weather_response: OpenWeatherResponse = response.json().await?;
+        
+        let mut forecast = WeatherForecast { hourly: Vec::new() };
+        
+        for hourly_data in weather_response.hourly.iter().take(24) {
+            let weather_data = WeatherData {
+                temperature: hourly_data.temp,
+                humidity: hourly_data.humidity,
+                wind_speed: hourly_data.wind_speed,
+                cloud_cover: hourly_data.clouds,
+                visibility: hourly_data.visibility.unwrap_or(10.0) / 1000.0, // конвертируем в км
+                precipitation_probability: hourly_data.pop * 100.0, // конвертируем в проценты
+                description: hourly_data.weather.first()
+                    .map(|w| w.description.clone())
+                    .unwrap_or_else(|| "Неизвестно".to_string()),
+                timestamp: DateTime::from_timestamp(hourly_data.dt, 0)
+                    .unwrap_or_else(|| Utc::now())
+                    .with_timezone(&Utc),
+            };
+            forecast.hourly.push(weather_data);
+        }
+
+        Ok(forecast)
+    }
+
+    async fn get_city_coordinates(&self) -> Result<CityCoordinates> {
+        let url = format!(
+            "http://api.openweathermap.org/geo/1.0/direct?q={}&limit=1&appid={}",
+            self.city, self.api_key
+        );
+
+        let response = reqwest::get(&url).await?;
+        
+        if !response.status().is_success() {
+            // Возвращаем координаты Москвы по умолчанию
+            return Ok(CityCoordinates { lat: 55.7558, lon: 37.6176 });
+        }
+
+        let coords: Vec<CityCoordinates> = response.json().await?;
+        
+        if let Some(coord) = coords.first() {
+            Ok(coord.clone())
+        } else {
+            // Возвращаем координаты Москвы по умолчанию
+            Ok(CityCoordinates { lat: 55.7558, lon: 37.6176 })
+        }
+    }
+
+    fn get_mock_forecast(&self) -> Result<WeatherForecast> {
+        // Моковые данные для демонстрации
         let mut forecast = WeatherForecast { hourly: Vec::new() };
 
         for hour in 0..24 {
@@ -62,6 +155,12 @@ impl WeatherService {
 
         Ok(forecast)
     }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct CityCoordinates {
+    lat: f64,
+    lon: f64,
 }
 
 pub fn analyze_weather_for_photography(forecast: &WeatherForecast) -> WeatherAnalysis {
