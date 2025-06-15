@@ -284,6 +284,76 @@ pub fn analyze_weather_for_photography(forecast: &WeatherForecast) -> WeatherAna
     analysis
 }
 
+pub fn analyze_astrophotography_conditions(forecast: &WeatherForecast) -> AstrophotographyAnalysis {
+    let mut analysis = AstrophotographyAnalysis {
+        is_suitable: true,
+        cloud_cover_issues: Vec::new(),
+        visibility_issues: Vec::new(),
+        recommendations: Vec::new(),
+        best_hours: Vec::new(),
+        concerns: Vec::new(),
+    };
+
+    // Анализируем условия для астрофотографии
+    for (hour, weather) in forecast.hourly.iter().enumerate() {
+        let mut hour_suitable = true;
+        let mut hour_concerns = Vec::new();
+
+        // Проверяем облачность (критично для астрофотографии)
+        if weather.cloud_cover > 20.0 {
+            hour_suitable = false;
+            hour_concerns.push(format!("Облачность {}% - не подходит для астрофотографии", weather.cloud_cover));
+        }
+
+        // Проверяем видимость
+        if weather.visibility < 10.0 {
+            hour_suitable = false;
+            hour_concerns.push(format!("Плохая видимость {} км", weather.visibility));
+        }
+
+        // Проверяем осадки
+        if weather.precipitation_probability > 10.0 {
+            hour_suitable = false;
+            hour_concerns.push(format!("Вероятность осадков {}%", weather.precipitation_probability));
+        }
+
+        // Проверяем ветер (может влиять на качество снимков)
+        if weather.wind_speed > 15.0 {
+            hour_concerns.push(format!("Сильный ветер {} м/с может влиять на качество", weather.wind_speed));
+        }
+
+        // Ночные часы (22:00 - 4:00) лучше подходят для астрофотографии
+        let is_night_hour = hour >= 22 || hour <= 4;
+
+        if hour_suitable && is_night_hour {
+            analysis.best_hours.push(hour);
+        }
+
+        if !hour_suitable {
+            analysis.is_suitable = false;
+            analysis.cloud_cover_issues.extend(hour_concerns);
+        }
+    }
+
+    // Формируем рекомендации
+    if analysis.is_suitable {
+        analysis.recommendations.push("Отличные условия для астрофотографии!".to_string());
+        analysis.recommendations.push("Ищите темные места вдали от городских огней".to_string());
+        analysis.recommendations.push("Используйте штатив для длительных экспозиций".to_string());
+    } else {
+        analysis.recommendations.push("Условия не подходят для астрофотографии".to_string());
+        analysis.recommendations.push("Рекомендуется перенести съемку на другой день".to_string());
+    }
+
+    // Проверяем общую облачность
+    let avg_cloud_cover = forecast.hourly.iter().map(|w| w.cloud_cover).sum::<f64>() / forecast.hourly.len() as f64;
+    if avg_cloud_cover > 50.0 {
+        analysis.concerns.push(format!("Высокая средняя облачность {}% - неблагоприятно для астрофотографии", avg_cloud_cover));
+    }
+
+    analysis
+}
+
 #[derive(Debug)]
 pub struct WeatherAnalysis {
     pub overall_score: f64,
@@ -292,14 +362,83 @@ pub struct WeatherAnalysis {
     pub concerns: Vec<String>,
 }
 
-pub fn print_weather_analysis(analysis: &WeatherAnalysis) {
+pub fn print_weather_analysis(analysis: &WeatherAnalysis, forecast: &WeatherForecast) {
     println!("\n{}", "=== АНАЛИЗ ПОГОДЫ ДЛЯ ФОТОГРАФИИ ===".bold().blue());
+
+    // Показываем текущие погодные условия
+    if let Some(current_weather) = forecast.hourly.first() {
+        println!("\n{}:", "ТЕКУЩИЕ УСЛОВИЯ".bold().cyan());
+        println!("  🌡️  Температура: {:.1}°C", current_weather.temperature);
+        println!("  💧 Влажность: {:.0}%", current_weather.humidity);
+        println!("  💨 Ветер: {:.1} м/с", current_weather.wind_speed);
+        println!("  ☁️  Облачность: {:.0}%", current_weather.cloud_cover);
+        println!("  👁️  Видимость: {:.1} км", current_weather.visibility);
+        println!("  🌧️  Вероятность осадков: {:.0}%", current_weather.precipitation_probability);
+        println!("  📝 Описание: {}", current_weather.description);
+    }
 
     println!(
         "\n{}: {:.1}/10",
         "Общий балл".bold(),
         analysis.overall_score
     );
+
+    // Показываем диапазон температур за день
+    if !forecast.hourly.is_empty() {
+        let min_temp = forecast.hourly.iter().map(|w| w.temperature).fold(f64::INFINITY, f64::min);
+        let max_temp = forecast.hourly.iter().map(|w| w.temperature).fold(f64::NEG_INFINITY, f64::max);
+        let avg_temp = forecast.hourly.iter().map(|w| w.temperature).sum::<f64>() / forecast.hourly.len() as f64;
+        
+        println!("\n{}:", "ТЕМПЕРАТУРНЫЙ РЕЖИМ".bold().magenta());
+        println!("  📊 Минимум: {:.1}°C", min_temp);
+        println!("  📊 Максимум: {:.1}°C", max_temp);
+        println!("  📊 Средняя: {:.1}°C", avg_temp);
+        
+        // Оценка температурного режима
+        if min_temp >= 10.0 && max_temp <= 25.0 {
+            println!("  ✅ Комфортный температурный диапазон для съемки");
+        } else if min_temp >= 5.0 && max_temp <= 30.0 {
+            println!("  ⚠️  Приемлемый температурный диапазон");
+        } else {
+            println!("  ❌ Неудобный температурный диапазон для съемки");
+        }
+    }
+
+    // Показываем информацию об осадках
+    if !forecast.hourly.is_empty() {
+        let max_precipitation = forecast.hourly.iter().map(|w| w.precipitation_probability).fold(0.0, f64::max);
+        let hours_with_precipitation = forecast.hourly.iter().filter(|w| w.precipitation_probability > 20.0).count();
+        
+        println!("\n{}:", "ОСАДКИ".bold().blue());
+        println!("  🌧️  Максимальная вероятность осадков: {:.0}%", max_precipitation);
+        println!("  ⏰ Часов с вероятностью осадков >20%: {}", hours_with_precipitation);
+        
+        if max_precipitation < 20.0 {
+            println!("  ✅ Благоприятные условия - низкая вероятность осадков");
+        } else if max_precipitation < 50.0 {
+            println!("  ⚠️  Умеренная вероятность осадков");
+        } else {
+            println!("  ❌ Высокая вероятность осадков - неблагоприятно для съемки");
+        }
+    }
+
+    // Показываем информацию о ветре
+    if !forecast.hourly.is_empty() {
+        let max_wind = forecast.hourly.iter().map(|w| w.wind_speed).fold(0.0, f64::max);
+        let avg_wind = forecast.hourly.iter().map(|w| w.wind_speed).sum::<f64>() / forecast.hourly.len() as f64;
+        
+        println!("\n{}:", "ВЕТЕР".bold().yellow());
+        println!("  💨 Максимальная скорость: {:.1} м/с", max_wind);
+        println!("  💨 Средняя скорость: {:.1} м/с", avg_wind);
+        
+        if max_wind < 10.0 {
+            println!("  ✅ Благоприятные ветровые условия");
+        } else if max_wind < 15.0 {
+            println!("  ⚠️  Умеренный ветер - может потребоваться штатив");
+        } else {
+            println!("  ❌ Сильный ветер - неблагоприятно для съемки");
+        }
+    }
 
     if !analysis.recommendations.is_empty() {
         println!("\n{}:", "Рекомендации".bold().green());
@@ -311,7 +450,12 @@ pub fn print_weather_analysis(analysis: &WeatherAnalysis) {
     if !analysis.best_hours.is_empty() {
         println!("\n{}:", "Лучшие часы для съемки".bold().yellow());
         for hour in &analysis.best_hours {
-            println!("  🕐 {}:00", hour);
+            if let Some(weather) = forecast.hourly.get(*hour) {
+                println!("  🕐 {}:00 - {}°C, ветер {:.1} м/с, облачность {:.0}%", 
+                    hour, weather.temperature, weather.wind_speed, weather.cloud_cover);
+            } else {
+                println!("  🕐 {}:00", hour);
+            }
         }
     }
 
@@ -321,4 +465,91 @@ pub fn print_weather_analysis(analysis: &WeatherAnalysis) {
             println!("  ⚠ {}", concern);
         }
     }
+
+    // Итоговая оценка
+    println!("\n{}:", "ИТОГОВАЯ ОЦЕНКА".bold().white());
+    if analysis.overall_score >= 8.0 {
+        println!("  🎯 ОТЛИЧНО! Идеальные условия для фотографии");
+    } else if analysis.overall_score >= 6.0 {
+        println!("  👍 ХОРОШО! Подходящие условия для съемки");
+    } else if analysis.overall_score >= 4.0 {
+        println!("  ⚠️  УДОВЛЕТВОРИТЕЛЬНО! Условия приемлемы, но не идеальны");
+    } else {
+        println!("  ❌ НЕБЛАГОПРИЯТНО! Условия не подходят для качественной съемки");
+    }
+}
+
+#[derive(Debug)]
+pub struct AstrophotographyAnalysis {
+    pub is_suitable: bool,
+    pub cloud_cover_issues: Vec<String>,
+    pub visibility_issues: Vec<String>,
+    pub recommendations: Vec<String>,
+    pub best_hours: Vec<usize>,
+    pub concerns: Vec<String>,
+}
+
+pub fn print_astrophotography_analysis(analysis: &AstrophotographyAnalysis, forecast: &WeatherForecast) {
+    println!("\n{}", "=== АНАЛИЗ ДЛЯ АСТРОФОТОГРАФИИ ===".bold().purple());
+
+    if analysis.is_suitable {
+        println!("\n{}", "✅ УСЛОВИЯ ПОДХОДЯТ ДЛЯ АСТРОФОТОГРАФИИ".bold().green());
+    } else {
+        println!("\n{}", "❌ УСЛОВИЯ НЕ ПОДХОДЯТ ДЛЯ АСТРОФОТОГРАФИИ".bold().red());
+    }
+
+    // Показываем статистику облачности
+    if !forecast.hourly.is_empty() {
+        let avg_cloud_cover = forecast.hourly.iter().map(|w| w.cloud_cover).sum::<f64>() / forecast.hourly.len() as f64;
+        let min_cloud_cover = forecast.hourly.iter().map(|w| w.cloud_cover).fold(f64::INFINITY, f64::min);
+        let max_cloud_cover = forecast.hourly.iter().map(|w| w.cloud_cover).fold(f64::NEG_INFINITY, f64::max);
+        
+        println!("\n{}:", "ОБЛАЧНОСТЬ".bold().blue());
+        println!("  ☁️  Средняя облачность: {:.0}%", avg_cloud_cover);
+        println!("  ☁️  Минимальная облачность: {:.0}%", min_cloud_cover);
+        println!("  ☁️  Максимальная облачность: {:.0}%", max_cloud_cover);
+        
+        if avg_cloud_cover > 50.0 {
+            println!("  ⚠️  Высокая облачность - неблагоприятно для астрофотографии");
+        } else if avg_cloud_cover > 20.0 {
+            println!("  ⚠️  Умеренная облачность - могут быть проблемы");
+        } else {
+            println!("  ✅ Низкая облачность - отлично для астрофотографии");
+        }
+    }
+
+    if !analysis.best_hours.is_empty() {
+        println!("\n{}:", "Лучшие часы для астрофотографии".bold().cyan());
+        for hour in &analysis.best_hours {
+            if let Some(weather) = forecast.hourly.get(*hour) {
+                println!("  🌙 {}:00 - облачность {:.0}%, видимость {:.1} км", 
+                    hour, weather.cloud_cover, weather.visibility);
+            } else {
+                println!("  🌙 {}:00", hour);
+            }
+        }
+    }
+
+    if !analysis.recommendations.is_empty() {
+        println!("\n{}:", "Рекомендации".bold().green());
+        for rec in &analysis.recommendations {
+            println!("  ✓ {}", rec);
+        }
+    }
+
+    if !analysis.concerns.is_empty() {
+        println!("\n{}:", "Проблемы".bold().red());
+        for concern in &analysis.concerns {
+            println!("  ⚠ {}", concern);
+        }
+    }
+
+    // Специальные советы для астрофотографии
+    println!("\n{}:", "СОВЕТЫ ДЛЯ АСТРОФОТОГРАФИИ".bold().yellow());
+    println!("  📸 Используйте штатив для стабильности");
+    println!("  📸 Установите высокое ISO (800-3200)");
+    println!("  📸 Используйте широкую диафрагму (f/2.8-f/4)");
+    println!("  📸 Делайте длительные экспозиции (15-30 секунд)");
+    println!("  📸 Ищите места вдали от городских огней");
+    println!("  📸 Проверяйте фазу Луны - полнолуние может мешать");
 }
