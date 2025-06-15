@@ -108,9 +108,12 @@ impl GoldenHourService {
     }
 }
 
-pub fn print_golden_hour_info(info: &GoldenHourInfo) {
+pub fn print_golden_hour_info(service: &GoldenHourService) {
+    let current_time = chrono::Local::now();
+    let info = service.calculate_golden_hours(current_time);
+    
     println!(
-        "Зол.час: {}-{} | Вечер: {}-{} | Син.утро: {}-{} | Син.вечер: {}-{}",
+        "🌅 Золотой час утро: {}-{} | 🌆 Золотой час вечер: {}-{} | 🌅 Синий час утро: {}-{} | 🌆 Синий час вечер: {}-{}",
         info.golden_hour_morning_start.format("%H:%M"),
         info.golden_hour_morning_end.format("%H:%M"),
         info.golden_hour_evening_start.format("%H:%M"),

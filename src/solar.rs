@@ -52,51 +52,49 @@ struct KpRecord {
 }
 
 pub async fn print_solar_data() -> Result<()> {
-    println!("{}", "☀️ Solar Wind:".bold().yellow());
-    
-    // Получаем данные солнечного ветра
     match fetch_solar_wind_data().await {
-        Ok(data) => {
-            println!("   Скорость: {:.1} км/s", data.speed);
-            println!("   Плотность: {:.1} частиц/см³", data.density);
-            println!("   Температура: {:.0} K", data.temperature);
-            println!("   Магнитное поле: {:.1} нТл", data.magnetic_field);
-            println!("   Время: {}", data.timestamp.format("%H:%M UTC"));
+        Ok(solar_wind) => {
+            println!(
+                "🌞 Солнечный ветер: 💨{:.1}км/с  📊{:.1}частиц/см³  🌡️{:.0}K  🕐{}",
+                solar_wind.speed,
+                solar_wind.density,
+                solar_wind.temperature,
+                solar_wind.timestamp.format("%H:%M")
+            );
         }
         Err(e) => {
-            println!("   Error - {}", e);
+            println!("❌ Ошибка получения данных солнечного ветра: {}", e);
         }
     }
 
-    println!("{}", "🌍 Geomagnetic:".bold().blue());
-    
-    // Получаем геомагнитные данные
     match fetch_geomagnetic_data().await {
-        Ok(data) => {
-            println!("   Kp индекс: {:.1}", data.kp_index);
-            println!("   Активность сияний: {:.1}/10", data.aurora_activity);
-            println!("   Солнечная радиация: {:.1}", data.solar_radiation);
-            println!("   Время: {}", data.timestamp.format("%H:%M UTC"));
+        Ok(geomagnetic) => {
+            println!(
+                "🌍 Геомагнитные данные: 🧲Kp {:.1}  🌌Активность сияний {:.1}/10  🕐{}",
+                geomagnetic.kp_index,
+                geomagnetic.aurora_activity,
+                geomagnetic.timestamp.format("%H:%M")
+            );
         }
         Err(e) => {
-            println!("   Error - {}", e);
+            println!("❌ Ошибка получения геомагнитных данных: {}", e);
         }
     }
 
-    println!("{}", "🌌 Aurora Forecast:".bold().purple());
-    
-    // Прогноз северных сияний
     match predict_aurora().await {
         Ok(forecast) => {
-            println!("   Вероятность: {:.1}%", forecast.visibility_probability * 100.0);
-            println!("   Интенсивность: {}", forecast.intensity_level);
-            println!("   Условия: {}", forecast.conditions);
+            println!(
+                "🌌 Прогноз северных сияний: {}%  📊{}  💡{}",
+                (forecast.visibility_probability * 100.0) as i32,
+                forecast.intensity_level,
+                forecast.conditions
+            );
             
             if !forecast.best_viewing_hours.is_empty() {
                 let mut intervals = Vec::new();
                 let mut start = forecast.best_viewing_hours[0];
                 let mut end = start;
-                
+
                 for &hour in &forecast.best_viewing_hours[1..] {
                     if hour == end + 1 {
                         end = hour;
@@ -116,11 +114,11 @@ pub async fn print_solar_data() -> Result<()> {
                     intervals.push(format!("{:02}:00-{:02}:00", start, end));
                 }
                 
-                println!("   Лучшие часы: {}", intervals.join(", "));
+                println!("   🕐 Лучшие часы для наблюдения: {}", intervals.join(", "));
             }
         }
         Err(e) => {
-            println!("   Error - {}", e);
+            println!("   ❌ Ошибка прогноза северных сияний: {}", e);
         }
     }
 

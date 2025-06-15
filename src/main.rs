@@ -7,107 +7,107 @@ mod weather;
 use colored::*;
 use dashboard::PhotographyDashboard;
 use golden_hour::{print_golden_hour_info, GoldenHourService};
+use log::{debug, info, warn, error};
 use photography_tips::{print_photography_tips, PhotographyTipsService};
 use solar::print_solar_data;
 use std::env;
 use weather::{
-    analyze_astrophotography_conditions, analyze_weather_for_photography,
     print_astrophotography_analysis, print_weather_analysis, WeatherService,
 };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Инициализация логирования
+    env_logger::init();
+    
     // Загружаем переменные окружения из файла .env
     dotenv::dotenv().ok();
 
-    println!("{}", "🚀 Запуск дашборда для фотографов...".bold().blue());
+    info!("🚀 Запуск дашборда для фотографов...");
+    debug!("Отладочный режим включен");
 
     // Параметры (в реальном приложении можно получать из конфигурации)
-    let api_key = env::var("WEATHER_API_KEY").unwrap_or_else(|_| "demo_key".to_string());
-    let city = env::var("CITY").unwrap_or_else(|_| "Москва".to_string());
+    let api_key = env::var("OPENWEATHER_API_KEY").unwrap_or_else(|_| {
+        warn!("OPENWEATHER_API_KEY не найден, используем demo_key");
+        "demo_key".to_string()
+    });
+    
+    let city = env::var("CITY").unwrap_or_else(|_| {
+        info!("CITY не найден, используем Москва");
+        "Moscow".to_string()
+    });
+    
     let latitude = env::var("LATITUDE")
         .unwrap_or_else(|_| "55.7558".to_string())
         .parse::<f64>()
         .unwrap_or(55.7558);
+    
     let longitude = env::var("LONGITUDE")
         .unwrap_or_else(|_| "37.6176".to_string())
         .parse::<f64>()
         .unwrap_or(37.6176);
 
+    debug!("Параметры: город={}, широта={}, долгота={}", city, latitude, longitude);
+
     // Создаем дашборд
     let dashboard = PhotographyDashboard::new(api_key.clone(), city.clone(), latitude, longitude);
-
+    
     // Генерируем сводку
-    let summary = match dashboard.generate_dashboard().await {
-        Ok(summary) => summary,
-        Err(e) => {
-            eprintln!("{}", "❌ ОШИБКА ГЕНЕРАЦИИ ДАШБОРДА".bold().red());
-            eprintln!("Причина: {}", e);
-            eprintln!(
-                "{}",
-                "💡 РЕШЕНИЕ: Проверьте настройки и попробуйте снова".yellow()
-            );
-            return Err(e);
+    match dashboard.generate_dashboard().await {
+        Ok(summary) => {
+            dashboard.print_dashboard(&summary);
         }
-    };
+        Err(e) => {
+            error!("Ошибка генерации дашборда: {}", e);
+            return Err(e.into());
+        }
+    }
 
-    // Выводим основной дашборд
-    dashboard.print_dashboard(&summary);
-
-    // Получаем детальную информацию для каждого модуля
     println!("\n{}", "📊 ДЕТАЛЬНАЯ ИНФОРМАЦИЯ".bold().cyan());
 
     // Погода
-    let weather_service = WeatherService::new(api_key.clone(), city.clone());
-    let weather_forecast = match weather_service.get_weather_forecast().await {
-        Ok(forecast) => forecast,
-        Err(e) => {
-            eprintln!("{}", "❌ ОШИБКА ПОЛУЧЕНИЯ ДАННЫХ ПОГОДЫ".bold().red());
-            eprintln!("Причина: {}", e);
-            eprintln!(
-                "{}",
-                "💡 РЕШЕНИЕ: Проверьте API ключ или используйте demo_key".yellow()
-            );
-            return Err(e.into());
+    let weather_service = WeatherService::new(api_key, city);
+    match weather_service.get_weather_forecast().await {
+        Ok(forecast) => {
+            debug!("Получен прогноз погоды: {} записей", forecast.hourly.len());
+            print_weather_analysis(&forecast);
+            
+            // Астрофотография
+            print_astrophotography_analysis(&forecast);
         }
-    };
-    let weather_analysis = analyze_weather_for_photography(&weather_forecast);
-    print_weather_analysis(&weather_analysis, &weather_forecast);
+        Err(e) => {
+            error!("Ошибка получения погоды: {}", e);
+            println!("❌ Ошибка получения данных погоды: {}", e);
+        }
+    }
 
-    // Анализ для астрофотографии
-    let astrophotography_analysis = analyze_astrophotography_conditions(&weather_forecast);
-    print_astrophotography_analysis(&astrophotography_analysis, &weather_forecast);
-
-    // Северные сияния и солнечные данные
-    if let Err(e) = print_solar_data().await {
-        eprintln!("{}", "❌ ОШИБКА ПОЛУЧЕНИЯ СОЛНЕЧНЫХ ДАННЫХ".bold().red());
-        eprintln!("Причина: {}", e);
+    // Солнечные данные
+    match print_solar_data().await {
+        Ok(_) => debug!("Солнечные данные успешно получены"),
+        Err(e) => {
+            error!("Ошибка получения солнечных данных: {}", e);
+            println!("❌ Ошибка получения солнечных данных: {}", e);
+        }
     }
 
     // Золотой час
     let golden_hour_service = GoldenHourService::new(latitude, longitude);
-    let current_time = chrono::Local::now();
-    let golden_hour_info = golden_hour_service.calculate_golden_hours(current_time);
-    print_golden_hour_info(&golden_hour_info);
+    print_golden_hour_info(&golden_hour_service);
 
-    // Советы для фотографов
+    println!("\n{}", "=== СОВЕТЫ ДЛЯ ФОТОГРАФОВ ===".bold().green());
+
+    // Советы по фотографии
     let tips_service = PhotographyTipsService::new();
-    let is_golden_hour = summary.is_golden_hour_today;
-    let photography_tips = tips_service.get_tips_for_weather(
-        summary.weather_score,
-        is_golden_hour,
-        summary.aurora_probability,
-    );
-    print_photography_tips(&photography_tips);
+    let tips = tips_service.get_general_recommendations();
+    print_photography_tips(&tips);
 
-    // Общие рекомендации
-    println!("\n{}", "=== ОБЩИЕ РЕКОМЕНДАЦИИ ===".bold().white());
-    let general_recommendations = tips_service.get_general_recommendations();
-    for (i, rec) in general_recommendations.iter().enumerate() {
-        println!("  {}. {}", i + 1, rec);
-    }
+    println!("\n{}", "=== ОБЩИЕ РЕКОМЕНДАЦИИ ===".bold().blue());
+    println!("  1. Всегда проверяйте прогноз погоды перед съемкой");
+    println!("  2. Планируйте локации заранее");
+    println!("  3. Берите запасные батареи и карты памяти");
+    println!("  4. Изучите правила съемки в выбранных местах");
+    println!("  5. Не забудьте о безопасности - особенно при съемке в дикой природе");
 
-    // Итог
-    println!("Итог: {}", summary.overall_recommendation);
+    info!("Дашборд завершен успешно");
     Ok(())
 }

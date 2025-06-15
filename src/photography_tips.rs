@@ -128,34 +128,8 @@ impl PhotographyTipsService {
     }
 }
 
-pub fn print_photography_tips(tips: &PhotographyTips) {
-    println!("\n{}", "=== СОВЕТЫ ДЛЯ ФОТОГРАФОВ ===".bold().magenta());
-
-    if !tips.equipment_recommendations.is_empty() {
-        println!("\n{}:", "Рекомендуемое оборудование".bold().cyan());
-        for rec in &tips.equipment_recommendations {
-            println!("  📷 {}", rec);
-        }
-    }
-
-    if !tips.shooting_tips.is_empty() {
-        println!("\n{}:", "Советы по съемке".bold().green());
-        for tip in &tips.shooting_tips {
-            println!("  💡 {}", tip);
-        }
-    }
-
-    if !tips.location_suggestions.is_empty() {
-        println!("\n{}:", "Рекомендуемые локации".bold().blue());
-        for location in &tips.location_suggestions {
-            println!("  📍 {}", location);
-        }
-    }
-
-    if !tips.technical_settings.is_empty() {
-        println!("\n{}:", "Технические настройки".bold().yellow());
-        for setting in &tips.technical_settings {
-            println!("  ⚙ {}", setting);
-        }
+pub fn print_photography_tips(tips: &Vec<String>) {
+    for (i, tip) in tips.iter().enumerate() {
+        println!("{}. {}", i + 1, tip);
     }
 }

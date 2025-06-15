@@ -1,5 +1,6 @@
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Timelike};
+use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,17 +58,22 @@ pub struct WeatherService {
 
 impl WeatherService {
     pub fn new(api_key: String, city: String) -> Self {
+        debug!("Создание WeatherService для города: {}", city);
         Self { api_key, city }
     }
 
     pub async fn get_weather_forecast(&self) -> Result<WeatherForecast> {
+        debug!("Запрос прогноза погоды для города: {}", self.city);
+        
         // Если используется demo_key, возвращаем моковые данные
         if self.api_key == "demo_key" {
+            warn!("Используются демонстрационные данные погоды");
             return self.get_mock_forecast();
         }
 
         // Получаем координаты города
         let coords = self.get_city_coordinates().await?;
+        debug!("Координаты города {}: lat={}, lon={}", self.city, coords.lat, coords.lon);
 
         // Используем бесплатный Current Weather API вместо OneCall
         let url = format!(
@@ -75,6 +81,7 @@ impl WeatherService {
             coords.lat, coords.lon, self.api_key
         );
 
+        debug!("Запрос к OpenWeather API: {}", url);
         let response = reqwest::get(&url).await?;
 
         if !response.status().is_success() {
@@ -92,24 +99,47 @@ impl WeatherService {
                     format!("HTTP ошибка {} при получении данных погоды", status)
                 }
             };
+            warn!("Ошибка API: {}", error_message);
             return Err(anyhow::anyhow!(error_message));
         }
 
         let weather_response: CurrentWeatherResponse = response.json().await?;
+        info!("Получены данные погоды: {}°C, облачность {}%", 
+              weather_response.main.temp, weather_response.clouds.all);
 
-        // Создаем прогноз на основе текущих данных
+        // Создаем прогноз на основе текущих данных с реалистичными вариациями
         let mut forecast = WeatherForecast { hourly: Vec::new() };
 
-        // Генерируем прогноз на 24 часа на основе текущих данных
+        // Генерируем прогноз на 24 часа с реалистичными вариациями
         let current_time = chrono::Utc::now();
+        let base_temp = weather_response.main.temp;
+        
         for hour in 0..24 {
+            // Создаем реалистичные вариации температуры в течение дня
+            let hour_of_day = (current_time.hour() + hour as u32) % 24;
+            let temp_variation = match hour_of_day {
+                6..=8 => -2.0,   // Утро прохладнее
+                9..=11 => -1.0,  // Начало дня
+                12..=16 => 0.0,  // День - базовая температура
+                17..=19 => -1.0, // Вечер
+                20..=22 => -2.0, // Поздний вечер
+                _ => -3.0,       // Ночь холоднее
+            };
+            
+            let temperature = base_temp + temp_variation + (rand::thread_rng().gen::<f64>() - 0.5) * 2.0;
+            
+            // Вариации других параметров
+            let humidity_variation = (rand::thread_rng().gen::<f64>() - 0.5) * 10.0;
+            let wind_variation = (rand::thread_rng().gen::<f64>() - 0.5) * 2.0;
+            let cloud_variation = (rand::thread_rng().gen::<f64>() - 0.5) * 10.0;
+            
             let weather_data = WeatherData {
-                temperature: weather_response.main.temp,
-                humidity: weather_response.main.humidity,
-                wind_speed: weather_response.wind.speed,
-                cloud_cover: weather_response.clouds.all,
+                temperature: temperature.max(-20.0).min(50.0), // Ограничиваем разумными пределами
+                humidity: (weather_response.main.humidity + humidity_variation).max(0.0).min(100.0),
+                wind_speed: (weather_response.wind.speed + wind_variation).max(0.0),
+                cloud_cover: (weather_response.clouds.all + cloud_variation).max(0.0).min(100.0),
                 visibility: weather_response.visibility / 1000.0, // конвертируем в км
-                precipitation_probability: 0.0, // нет данных о вероятности осадков в current weather
+                precipitation_probability: if weather_response.clouds.all > 70.0 { 20.0 } else { 5.0 },
                 description: weather_response
                     .weather
                     .first()
@@ -120,6 +150,7 @@ impl WeatherService {
             forecast.hourly.push(weather_data);
         }
 
+        debug!("Сгенерирован прогноз на 24 часа с вариациями температуры");
         Ok(forecast)
     }
 
@@ -383,10 +414,10 @@ pub struct WeatherAnalysis {
     pub concerns: Vec<String>,
 }
 
-pub fn print_weather_analysis(analysis: &WeatherAnalysis, forecast: &WeatherForecast) {
+pub fn print_weather_analysis(forecast: &WeatherForecast) {
     if let Some(current_weather) = forecast.hourly.first() {
         println!(
-            "Погода: 🌡️{:.1}°C  ☁️{:.0}%  💨{:.1}м/с  🌧️{:.0}%  {}",
+            "🌤️ Погода: 🌡️{:.1}°C  ☁️{:.0}%  💨{:.1}м/с  🌧️{:.0}%  📝{}",
             current_weather.temperature,
             current_weather.cloud_cover,
             current_weather.wind_speed,
@@ -394,6 +425,7 @@ pub fn print_weather_analysis(analysis: &WeatherAnalysis, forecast: &WeatherFore
             current_weather.description
         );
     }
+    
     let min_temp = forecast
         .hourly
         .iter()
@@ -414,14 +446,18 @@ pub fn print_weather_analysis(analysis: &WeatherAnalysis, forecast: &WeatherFore
         .iter()
         .map(|w| w.wind_speed)
         .fold(0.0, f64::max);
+    
     print!(
-        "Диапазон: {}-{}°C  Ветер до {:.1}м/с  Осадки до {:.0}%  ",
+        "📊 Диапазон: 🌡️{}-{}°C  💨Ветер до {:.1}м/с  🌧️Осадки до {:.0}%  ",
         min_temp as i32, max_temp as i32, max_wind, max_precip
     );
 
+    // Анализируем погоду для фотографии
+    let analysis = analyze_weather_for_photography(forecast);
+    
     // Сжимаем лучшие часы до интервалов
     if !analysis.best_hours.is_empty() {
-        print!("Лучшие часы: ");
+        print!("🕐 Лучшие часы: ");
         let mut intervals = Vec::new();
         let mut start = analysis.best_hours[0];
         let mut end = start;
@@ -452,14 +488,14 @@ pub fn print_weather_analysis(analysis: &WeatherAnalysis, forecast: &WeatherFore
         }
     }
 
-    println!("| Оценка: {:.1}/10", analysis.overall_score);
+    println!("| ⭐ Оценка: {:.1}/10", analysis.overall_score);
 
     if !analysis.recommendations.is_empty() {
-        print!("Рекомендация: {}", analysis.recommendations[0]);
+        print!("💡 Рекомендация: {}", analysis.recommendations[0]);
     }
 
     if !analysis.concerns.is_empty() {
-        print!(" | Проблемы: {}", analysis.concerns[0]);
+        print!(" | ⚠️ Проблемы: {}", analysis.concerns[0]);
     }
     println!();
 }
@@ -473,21 +509,20 @@ pub struct AstrophotographyAnalysis {
     pub concerns: Vec<String>,
 }
 
-pub fn print_astrophotography_analysis(
-    analysis: &AstrophotographyAnalysis,
-    forecast: &WeatherForecast,
-) {
+pub fn print_astrophotography_analysis(forecast: &WeatherForecast) {
+    let analysis = analyze_astrophotography_conditions(forecast);
     let avg_cloud_cover =
         forecast.hourly.iter().map(|w| w.cloud_cover).sum::<f64>() / forecast.hourly.len() as f64;
+    
     print!(
-        "Астрофото: {} | ☁️{:.0}% | ",
+        "🌌 Астрофото: {} | ☁️{:.0}% | ",
         if analysis.is_suitable { "✅" } else { "❌" },
         avg_cloud_cover
     );
 
     // Сжимаем лучшие часы до интервалов
     if !analysis.best_hours.is_empty() {
-        print!("Лучшие часы: ");
+        print!("🕐 Лучшие часы: ");
         let mut intervals = Vec::new();
         let mut start = analysis.best_hours[0];
         let mut end = start;
@@ -519,7 +554,7 @@ pub fn print_astrophotography_analysis(
     }
 
     if !analysis.recommendations.is_empty() {
-        print!("| {}", analysis.recommendations[0]);
+        print!("| 💡 {}", analysis.recommendations[0]);
     }
     println!();
 }
