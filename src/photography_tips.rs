@@ -139,8 +139,6 @@ mod tests {
     #[test]
     fn test_photography_tips_service_new() {
         let _service = PhotographyTipsService::new();
-        // Просто проверяем, что сервис создается без ошибок
-        assert!(true);
     }
 
     #[test]
@@ -280,13 +278,14 @@ mod tests {
     #[test]
     fn test_photography_tips_structure() {
         let service = PhotographyTipsService::new();
-        let tips = service.get_tips_for_weather(5.0, false, 0.3);
+        // Используем параметры, которые гарантированно добавят рекомендации
+        let tips = service.get_tips_for_weather(4.0, true, 0.6);
         
         // Проверяем структуру объекта
-        assert!(tips.equipment_recommendations.len() >= 0);
-        assert!(tips.shooting_tips.len() >= 0);
-        assert!(tips.location_suggestions.len() >= 0);
-        assert!(tips.technical_settings.len() >= 0);
+        assert!(!tips.equipment_recommendations.is_empty());
+        assert!(!tips.shooting_tips.is_empty());
+        assert!(!tips.location_suggestions.is_empty());
+        assert!(!tips.technical_settings.is_empty());
         
         // Проверяем, что все рекомендации не пустые
         for tip in &tips.equipment_recommendations {
@@ -317,10 +316,10 @@ mod tests {
         assert!(has_protection_min);
         
         // При максимальных значениях должно быть много рекомендаций
-        assert!(tips_max.equipment_recommendations.len() > 0);
-        assert!(tips_max.shooting_tips.len() > 0);
-        assert!(tips_max.location_suggestions.len() > 0);
-        assert!(tips_max.technical_settings.len() > 0);
+        assert!(!tips_max.equipment_recommendations.is_empty());
+        assert!(!tips_max.shooting_tips.is_empty());
+        assert!(!tips_max.location_suggestions.is_empty());
+        assert!(!tips_max.technical_settings.is_empty());
     }
 
     #[test]

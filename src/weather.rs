@@ -709,8 +709,8 @@ mod tests {
         let analysis = analyze_astrophotography_conditions(&forecast);
         
         // Проверяем структуру анализа
-        assert!(analysis.recommendations.len() > 0);
-        assert!(analysis.cloud_cover_issues.len() >= 0);
+        assert!(!analysis.recommendations.is_empty());
+        // Не проверяем на >= 0, это всегда true
     }
 
     #[test]

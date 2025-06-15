@@ -263,24 +263,14 @@ mod tests {
         Local.from_local_datetime(&naive_datetime).unwrap()
     }
 
-    fn create_golden_hour_time() -> DateTime<Local> {
-        // Время в золотой час
-        let naive_date = NaiveDate::from_ymd_opt(2024, 6, 15).unwrap();
-        let naive_datetime = NaiveDateTime::new(naive_date, chrono::NaiveTime::from_hms_opt(19, 0, 0).unwrap());
-        Local.from_local_datetime(&naive_datetime).unwrap()
-    }
-
     #[test]
     fn test_photography_dashboard_new() {
-        let dashboard = PhotographyDashboard::new(
+        let _dashboard = PhotographyDashboard::new(
             "test_key".to_string(),
             "TestCity".to_string(),
             55.7558,
             37.6176,
         );
-        
-        // Проверяем, что дашборд создается без ошибок
-        assert!(true);
     }
 
     #[test]
@@ -298,9 +288,6 @@ mod tests {
         // В обычное время не должно быть золотого часа
         let _is_golden = _dashboard.is_golden_hour_today(&golden_hour_info, test_date);
         // Этот тест может быть нестабильным из-за реального времени, поэтому проверяем только логику
-        
-        // Проверяем, что функция работает без ошибок
-        assert!(true);
     }
 
     #[test]
@@ -349,11 +336,9 @@ mod tests {
         // Проверяем структуру сводки
         assert_eq!(summary.weather_score, 7.5);
         assert_eq!(summary.aurora_probability, 0.3);
-        assert_eq!(summary.is_golden_hour_today, false);
+        assert!(!summary.is_golden_hour_today);
         assert_eq!(summary.best_shooting_hours, vec![6, 7, 8, 18, 19, 20]);
         assert!(!summary.overall_recommendation.is_empty());
-        assert!(summary.key_highlights.len() >= 0);
-        assert!(summary.warnings.len() >= 0);
     }
 
     #[test]
@@ -440,7 +425,7 @@ mod tests {
         
         // Проверяем, что лучшие часы в разумных пределах
         for &hour in &summary.best_shooting_hours {
-            assert!(hour >= 0 && hour <= 23);
+            assert!((0..=23).contains(&hour));
         }
     }
 
