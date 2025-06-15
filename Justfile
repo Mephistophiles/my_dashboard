@@ -64,6 +64,13 @@ pre-commit: check build
 
 # Release-процедура с параметром версии
 # Использование: just release 0.5.0
+# 
+# ПЕРЕД РЕЛИЗОМ ОБЯЗАТЕЛЬНО:
+# 1. Обновите CHANGELOG.md - переместите изменения из [Unreleased] в новую версию
+# 2. Убедитесь, что все тесты проходят: just test
+# 3. Проверьте качество кода: just clippy
+# 4. Убедитесь, что покрытие кода соответствует требованиям: just coverage-strict
+#
 release version: pre-commit build-release
     git add .
     git commit -m "release: v{{version}}"
