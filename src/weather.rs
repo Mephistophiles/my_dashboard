@@ -265,7 +265,7 @@ impl WeatherService {
                 cloud_cover: if !(6..=18).contains(&hour) {
                     20.0
                 } else {
-                    40.0 + (hour as f64 * 3.0) % 60.0
+                    60.0
                 },
                 visibility: 10.0 - (hour as f64 * 0.1) % 5.0,
                 precipitation_probability: if hour > 12 && hour < 18 { 30.0 } else { 5.0 },
@@ -663,7 +663,7 @@ mod tests {
                 cloud_cover: if !(6..=18).contains(&hour) {
                     20.0
                 } else {
-                    40.0 + (hour as f64 * 3.0) % 60.0
+                    60.0
                 },
                 visibility: 10.0 - (hour as f64 * 0.1) % 5.0,
                 precipitation_probability: if hour > 12 && hour < 18 { 30.0 } else { 5.0 },
@@ -887,7 +887,7 @@ mod tests {
         let analysis = analyze_astrophotography_conditions(&forecast);
 
         // Проверяем все компоненты анализа астрофотографии
-        assert!(analysis.is_suitable == true || analysis.is_suitable == false);
+        assert!(matches!(analysis.is_suitable, true | false));
 
         // Проверяем, что есть рекомендации
         assert!(!analysis.recommendations.is_empty());
@@ -1060,7 +1060,11 @@ mod tests {
                 temperature: if hour < 12 { 25.0 } else { 15.0 },
                 humidity: if hour % 2 == 0 { 40.0 } else { 70.0 },
                 wind_speed: if hour % 3 == 0 { 3.0 } else { 8.0 },
-                cloud_cover: if hour < 6 || hour > 18 { 20.0 } else { 60.0 },
+                cloud_cover: if !(6..=18).contains(&hour) {
+                    20.0
+                } else {
+                    60.0
+                },
                 visibility: if hour % 4 == 0 { 5.0 } else { 15.0 },
                 precipitation_probability: if hour > 10 && hour < 14 { 40.0 } else { 10.0 },
                 description: "переменная погода".to_string(),

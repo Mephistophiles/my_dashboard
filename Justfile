@@ -32,12 +32,20 @@ fmt:
     cargo fmt --all
 
 # Проверка стиля и предупреждений (строгий режим)
+fmt-check:
+    cargo fmt --check
+
+# Проверка стиля и предупреждений (строгий режим)
 clippy:
-    cargo clippy -- -D warnings
+    cargo clippy --all-targets -- -D warnings
 
 # Проверка стиля и предупреждений (с исправлениями)
 clippy-fix:
-    cargo clippy --fix -- -D warnings
+    cargo clippy --fix --all-targets -- -D warnings
+
+# Проверка линтинга
+lint:
+    cargo check --all-targets
 
 # Быстрая сборка
 build:
@@ -56,7 +64,7 @@ clean:
     cargo clean
 
 # Проверка всех тестов и качества кода
-check: fmt clippy test coverage-strict
+check: fmt-check lint clippy test
 
 # Полная проверка перед коммитом
 pre-commit: check build

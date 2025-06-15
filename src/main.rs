@@ -280,24 +280,18 @@ mod tests {
     fn test_golden_hour_service_integration() {
         let service = GoldenHourService::new(55.7558, 37.6176);
         let current_time = chrono::Local::now();
-
-        // Тестируем основные методы сервиса
         let info = service.calculate_golden_hours(current_time);
         assert!(info.sunrise < info.sunset);
-
         let condition = service.get_current_lighting_condition(current_time);
         assert!(!condition.is_empty());
-
-        let is_golden = service.is_golden_hour();
-        assert!(is_golden == true || is_golden == false);
+        // Просто вызываем метод, чтобы покрыть код
+        let _ = service.is_golden_hour();
     }
 
     #[test]
     fn test_weather_service_integration() {
-        let service = WeatherService::new("demo_key".to_string(), "Moscow".to_string());
-
-        // Тестируем создание сервиса (не можем проверить приватные поля)
-        assert!(true); // Сервис создался успешно
+        let _service = WeatherService::new("demo_key".to_string(), "Moscow".to_string());
+        // Проверяем только создание
     }
 
     #[test]

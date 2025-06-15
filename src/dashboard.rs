@@ -611,9 +611,7 @@ mod tests {
             warnings: vec![],
         };
 
-        // Тестируем, что функция не падает
         dashboard.print_dashboard(&summary);
-        assert!(true); // Функция выполнилась без ошибок
     }
 
     #[test]
@@ -635,8 +633,6 @@ mod tests {
             warnings: vec!["Плохая погода".to_string(), "Нет золотого часа".to_string()],
         };
 
-        // Тестируем, что функция не падает с предупреждениями
         dashboard.print_dashboard(&summary);
-        assert!(true); // Функция выполнилась без ошибок
     }
 }

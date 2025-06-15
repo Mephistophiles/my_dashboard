@@ -283,7 +283,7 @@ pub async fn predict_aurora() -> Result<AuroraForecast> {
     let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
 
     // Преобразуем активность (0-10) в вероятность (0-1)
-    let probability = (activity as f64 / 10.0_f64).min(1.0);
+    let probability = (activity / 10.0_f64).min(1.0);
 
     // Определяем уровень интенсивности
     let intensity_level = if probability > 0.8 {
@@ -407,7 +407,7 @@ mod tests {
 
         // Проверяем, что лучшие часы находятся в ночном диапазоне
         for &hour in &forecast.best_viewing_hours {
-            assert!(hour <= 23);
+            assert!((0..=23).contains(&hour));
         }
     }
 
@@ -423,7 +423,7 @@ mod tests {
 
         // Тестируем создание прогноза
         let forecast = AuroraForecast {
-            visibility_probability: (activity as f64 / 10.0_f64).min(1.0),
+            visibility_probability: (activity / 10.0_f64).min(1.0),
             intensity_level: if activity > 8.0 {
                 "Очень высокая"
             } else if activity > 6.0 {
@@ -464,7 +464,7 @@ mod tests {
         assert!(activity > 6.0); // Должна быть высокая активность
 
         let forecast = AuroraForecast {
-            visibility_probability: (activity as f64 / 10.0_f64).min(1.0),
+            visibility_probability: (activity / 10.0_f64).min(1.0),
             intensity_level: "Высокая".to_string(),
             best_viewing_hours: vec![22, 23, 0, 1, 2, 3, 4, 5],
             conditions: "Отличные условия для наблюдения северных сияний".to_string(),
@@ -574,7 +574,7 @@ mod tests {
 
         // Проверяем, что все часы находятся в ночном диапазоне
         for &hour in &best_hours {
-            assert!(hour >= 0 && hour <= 23);
+            assert!((0..=23).contains(&hour));
         }
 
         // Проверяем, что часы идут в правильном порядке
@@ -684,7 +684,7 @@ mod tests {
     #[test]
     fn test_aurora_probability_calculation() {
         let activity = 7.5;
-        let probability = (activity as f64 / 10.0_f64).min(1.0);
+        let probability = (activity / 10.0_f64).min(1.0);
 
         assert_eq!(probability, 0.75);
         assert!((0.0..=1.0).contains(&probability));
