@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc, Local};
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use colored::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WeatherData {
@@ -34,13 +34,17 @@ impl WeatherService {
         // В реальном приложении здесь был бы вызов API OpenWeatherMap или другого сервиса
         // Для демонстрации создаем моковые данные
         let mut forecast = WeatherForecast { hourly: Vec::new() };
-        
+
         for hour in 0..24 {
             let weather_data = WeatherData {
                 temperature: 15.0 + (hour as f64 * 0.5) - 6.0, // Температура от 9 до 21 градуса
                 humidity: 60.0 + (hour as f64 * 2.0) % 40.0,
                 wind_speed: 5.0 + (hour as f64 * 0.3) % 15.0,
-                cloud_cover: if hour < 6 || hour > 18 { 20.0 } else { 40.0 + (hour as f64 * 3.0) % 60.0 },
+                cloud_cover: if !(6..=18).contains(&hour) {
+                    20.0
+                } else {
+                    40.0 + (hour as f64 * 3.0) % 60.0
+                },
                 visibility: 10.0 - (hour as f64 * 0.1) % 5.0,
                 precipitation_probability: if hour > 12 && hour < 18 { 30.0 } else { 5.0 },
                 description: match hour {
@@ -55,7 +59,7 @@ impl WeatherService {
             };
             forecast.hourly.push(weather_data);
         }
-        
+
         Ok(forecast)
     }
 }
@@ -110,14 +114,17 @@ pub fn analyze_weather_for_photography(forecast: &WeatherForecast) -> WeatherAna
         if weather.precipitation_probability < 20.0 {
             hour_score += 1.0;
         } else {
-            hour_concerns.push(format!("Вероятность осадков: {}%", weather.precipitation_probability));
+            hour_concerns.push(format!(
+                "Вероятность осадков: {}%",
+                weather.precipitation_probability
+            ));
         }
 
         // Специальные условия для фотографии
-        if hour >= 6 && hour <= 8 {
+        if (6..=8).contains(&hour) {
             hour_score += 2.0; // Золотой час утром
             hour_recommendations.push("Золотой час - идеальное время для съемки".to_string());
-        } else if hour >= 18 && hour <= 20 {
+        } else if (18..=20).contains(&hour) {
             hour_score += 2.0; // Золотой час вечером
             hour_recommendations.push("Золотой час - идеальное время для съемки".to_string());
         }
@@ -133,11 +140,17 @@ pub fn analyze_weather_for_photography(forecast: &WeatherForecast) -> WeatherAna
 
     // Общие рекомендации
     if analysis.overall_score >= 7.0 {
-        analysis.recommendations.push("Отличные условия для фотографии!".to_string());
+        analysis
+            .recommendations
+            .push("Отличные условия для фотографии!".to_string());
     } else if analysis.overall_score >= 5.0 {
-        analysis.recommendations.push("Хорошие условия для съемки".to_string());
+        analysis
+            .recommendations
+            .push("Хорошие условия для съемки".to_string());
     } else {
-        analysis.recommendations.push("Условия не идеальны для фотографии".to_string());
+        analysis
+            .recommendations
+            .push("Условия не идеальны для фотографии".to_string());
     }
 
     analysis
@@ -153,23 +166,27 @@ pub struct WeatherAnalysis {
 
 pub fn print_weather_analysis(analysis: &WeatherAnalysis) {
     println!("\n{}", "=== АНАЛИЗ ПОГОДЫ ДЛЯ ФОТОГРАФИИ ===".bold().blue());
-    
-    println!("\n{}: {:.1}/10", "Общий балл".bold(), analysis.overall_score);
-    
+
+    println!(
+        "\n{}: {:.1}/10",
+        "Общий балл".bold(),
+        analysis.overall_score
+    );
+
     if !analysis.recommendations.is_empty() {
         println!("\n{}:", "Рекомендации".bold().green());
         for rec in &analysis.recommendations {
             println!("  ✓ {}", rec);
         }
     }
-    
+
     if !analysis.best_hours.is_empty() {
         println!("\n{}:", "Лучшие часы для съемки".bold().yellow());
         for hour in &analysis.best_hours {
             println!("  🕐 {}:00", hour);
         }
     }
-    
+
     if !analysis.concerns.is_empty() {
         println!("\n{}:", "Потенциальные проблемы".bold().red());
         for concern in &analysis.concerns {

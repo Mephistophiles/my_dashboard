@@ -1,6 +1,6 @@
-use chrono::{DateTime, Local, NaiveDateTime, Timelike, Datelike};
-use sunrise::sunrise_sunset;
+use chrono::{DateTime, Datelike, Local};
 use colored::*;
+use sunrise::sunrise_sunset;
 
 #[derive(Debug)]
 pub struct GoldenHourInfo {
@@ -23,7 +23,10 @@ pub struct GoldenHourService {
 
 impl GoldenHourService {
     pub fn new(latitude: f64, longitude: f64) -> Self {
-        Self { latitude, longitude }
+        Self {
+            latitude,
+            longitude,
+        }
     }
 
     pub fn calculate_golden_hours(&self, date: DateTime<Local>) -> GoldenHourInfo {
@@ -74,21 +77,24 @@ impl GoldenHourService {
 
     pub fn get_current_lighting_condition(&self, current_time: DateTime<Local>) -> String {
         let golden_hours = self.calculate_golden_hours(current_time);
-        
-        if current_time >= golden_hours.golden_hour_morning_start && 
-           current_time <= golden_hours.golden_hour_morning_end {
+
+        if current_time >= golden_hours.golden_hour_morning_start
+            && current_time <= golden_hours.golden_hour_morning_end
+        {
             "Золотой час (утро)".to_string()
-        } else if current_time >= golden_hours.golden_hour_evening_start && 
-                  current_time <= golden_hours.golden_hour_evening_end {
+        } else if current_time >= golden_hours.golden_hour_evening_start
+            && current_time <= golden_hours.golden_hour_evening_end
+        {
             "Золотой час (вечер)".to_string()
-        } else if current_time >= golden_hours.blue_hour_morning_start && 
-                  current_time <= golden_hours.blue_hour_morning_end {
+        } else if current_time >= golden_hours.blue_hour_morning_start
+            && current_time <= golden_hours.blue_hour_morning_end
+        {
             "Синий час (утро)".to_string()
-        } else if current_time >= golden_hours.blue_hour_evening_start && 
-                  current_time <= golden_hours.blue_hour_evening_end {
+        } else if current_time >= golden_hours.blue_hour_evening_start
+            && current_time <= golden_hours.blue_hour_evening_end
+        {
             "Синий час (вечер)".to_string()
-        } else if current_time >= golden_hours.sunrise && 
-                  current_time <= golden_hours.sunset {
+        } else if current_time >= golden_hours.sunrise && current_time <= golden_hours.sunset {
             "Дневное время".to_string()
         } else {
             "Ночное время".to_string()
@@ -98,32 +104,44 @@ impl GoldenHourService {
 
 pub fn print_golden_hour_info(info: &GoldenHourInfo) {
     println!("\n{}", "=== ЗОЛОТОЙ ЧАС И ВРЕМЯ СЪЕМКИ ===".bold().yellow());
-    
-    println!("\n{}: {}", "Восход солнца".bold(), info.sunrise.format("%H:%M"));
+
+    println!(
+        "\n{}: {}",
+        "Восход солнца".bold(),
+        info.sunrise.format("%H:%M")
+    );
     println!("{}: {}", "Закат солнца".bold(), info.sunset.format("%H:%M"));
-    
+
     println!("\n{}:", "Золотой час (утро)".bold().yellow());
-    println!("  🌅 {} - {}", 
+    println!(
+        "  🌅 {} - {}",
         info.golden_hour_morning_start.format("%H:%M"),
-        info.golden_hour_morning_end.format("%H:%M"));
-    
+        info.golden_hour_morning_end.format("%H:%M")
+    );
+
     println!("\n{}:", "Золотой час (вечер)".bold().yellow());
-    println!("  🌇 {} - {}", 
+    println!(
+        "  🌇 {} - {}",
         info.golden_hour_evening_start.format("%H:%M"),
-        info.golden_hour_evening_end.format("%H:%M"));
-    
+        info.golden_hour_evening_end.format("%H:%M")
+    );
+
     println!("\n{}:", "Синий час (утро)".bold().blue());
-    println!("  🌊 {} - {}", 
+    println!(
+        "  🌊 {} - {}",
         info.blue_hour_morning_start.format("%H:%M"),
-        info.blue_hour_morning_end.format("%H:%M"));
-    
+        info.blue_hour_morning_end.format("%H:%M")
+    );
+
     println!("\n{}:", "Синий час (вечер)".bold().blue());
-    println!("  🌊 {} - {}", 
+    println!(
+        "  🌊 {} - {}",
         info.blue_hour_evening_start.format("%H:%M"),
-        info.blue_hour_evening_end.format("%H:%M"));
-    
+        info.blue_hour_evening_end.format("%H:%M")
+    );
+
     println!("\n{}:", "Рекомендации для фотографов".bold().green());
     println!("  📸 Золотой час - идеальное время для портретов и пейзажей");
     println!("  📸 Синий час - отлично подходит для городских пейзажей");
     println!("  📸 Планируйте съемку заранее, учитывая время восхода/заката");
-} 
+}
