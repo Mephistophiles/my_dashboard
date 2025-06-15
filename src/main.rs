@@ -10,7 +10,7 @@ use golden_hour::{print_golden_hour_info, GoldenHourService};
 use photography_tips::{print_photography_tips, PhotographyTipsService};
 use solar::{print_aurora_forecast, SolarService};
 use std::env;
-use weather::{analyze_weather_for_photography, print_weather_analysis, WeatherService};
+use weather::{analyze_weather_for_photography, print_weather_analysis, WeatherService, analyze_astrophotography_conditions, print_astrophotography_analysis};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,7 +69,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     let weather_analysis = analyze_weather_for_photography(&weather_forecast);
-    print_weather_analysis(&weather_analysis);
+    print_weather_analysis(&weather_analysis, &weather_forecast);
+
+    // Анализ для астрофотографии
+    let astrophotography_analysis = analyze_astrophotography_conditions(&weather_forecast);
+    print_astrophotography_analysis(&astrophotography_analysis, &weather_forecast);
 
     // Северные сияния
     let solar_service = SolarService::new();
@@ -103,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     let aurora_forecast = solar_service.predict_aurora(&solar_wind_data, &geomagnetic_data);
-    print_aurora_forecast(&aurora_forecast);
+    print_aurora_forecast(&aurora_forecast, &solar_wind_data, &geomagnetic_data);
 
     // Золотой час
     let golden_hour_service = GoldenHourService::new(latitude, longitude);
