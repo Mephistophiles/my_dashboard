@@ -10,7 +10,10 @@ use golden_hour::{print_golden_hour_info, GoldenHourService};
 use photography_tips::{print_photography_tips, PhotographyTipsService};
 use solar::{print_aurora_forecast, SolarService};
 use std::env;
-use weather::{analyze_weather_for_photography, print_weather_analysis, WeatherService, analyze_astrophotography_conditions, print_astrophotography_analysis};
+use weather::{
+    analyze_astrophotography_conditions, analyze_weather_for_photography,
+    print_astrophotography_analysis, print_weather_analysis, WeatherService,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -132,12 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  {}. {}", i + 1, rec);
     }
 
-    println!("\n{}", "🎯 Итоговая рекомендация:".bold().green());
-    println!("{}", summary.overall_recommendation);
-
-    println!("\n{}", "=".repeat(60));
-    println!("{}", "Спасибо за использование дашборда! 📸".bold().blue());
-    println!("{}", "=".repeat(60));
-
+    // Итог
+    println!("Итог: {}", summary.overall_recommendation);
     Ok(())
 }

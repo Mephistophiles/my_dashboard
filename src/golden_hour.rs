@@ -110,45 +110,14 @@ impl GoldenHourService {
 }
 
 pub fn print_golden_hour_info(info: &GoldenHourInfo) {
-    println!("\n{}", "=== ЗОЛОТОЙ ЧАС И ВРЕМЯ СЪЕМКИ ===".bold().yellow());
-
-    println!(
-        "\n{}: {}",
-        "Восход солнца".bold(),
-        info.sunrise.format("%H:%M")
-    );
-    println!("{}: {}", "Закат солнца".bold(), info.sunset.format("%H:%M"));
-
-    println!("\n{}:", "Золотой час (утро)".bold().yellow());
-    println!(
-        "  🌅 {} - {}",
+    print!("Зол.час: {}-{} | Вечер: {}-{} | Син.утро: {}-{} | Син.вечер: {}-{}\n",
         info.golden_hour_morning_start.format("%H:%M"),
-        info.golden_hour_morning_end.format("%H:%M")
-    );
-
-    println!("\n{}:", "Золотой час (вечер)".bold().yellow());
-    println!(
-        "  🌇 {} - {}",
+        info.golden_hour_morning_end.format("%H:%M"),
         info.golden_hour_evening_start.format("%H:%M"),
-        info.golden_hour_evening_end.format("%H:%M")
-    );
-
-    println!("\n{}:", "Синий час (утро)".bold().blue());
-    println!(
-        "  🌊 {} - {}",
+        info.golden_hour_evening_end.format("%H:%M"),
         info.blue_hour_morning_start.format("%H:%M"),
-        info.blue_hour_morning_end.format("%H:%M")
-    );
-
-    println!("\n{}:", "Синий час (вечер)".bold().blue());
-    println!(
-        "  🌊 {} - {}",
+        info.blue_hour_morning_end.format("%H:%M"),
         info.blue_hour_evening_start.format("%H:%M"),
         info.blue_hour_evening_end.format("%H:%M")
     );
-
-    println!("\n{}:", "Рекомендации для фотографов".bold().green());
-    println!("  📸 Золотой час - идеальное время для портретов и пейзажей");
-    println!("  📸 Синий час - отлично подходит для городских пейзажей");
-    println!("  📸 Планируйте съемку заранее, учитывая время восхода/заката");
 }

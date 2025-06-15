@@ -37,8 +37,6 @@ struct NOAARealTimeData {
 
 #[derive(Debug, Deserialize)]
 struct NOAADataPoint {
-    #[serde(rename = "time_tag")]
-    time_tag: String,
     #[serde(rename = "density")]
     density: Option<f64>,
     #[serde(rename = "speed")]
@@ -56,8 +54,6 @@ struct KPIndexData {
 
 #[derive(Debug, Deserialize)]
 struct KPDataPoint {
-    #[serde(rename = "time_tag")]
-    time_tag: String,
     #[serde(rename = "kp_index")]
     kp_index: Option<f64>,
 }
@@ -72,7 +68,7 @@ impl SolarService {
     pub async fn get_solar_wind_data(&self) -> Result<SolarWindData> {
         // Получаем реальные данные от NOAA Space Weather API
         let url = "https://services.swpc.noaa.gov/json/plasma/plasma-6-hour.json";
-        
+
         let response = match reqwest::get(url).await {
             Ok(resp) => resp,
             Err(_) => {
@@ -80,7 +76,7 @@ impl SolarService {
                 return self.get_mock_solar_wind_data();
             }
         };
-        
+
         if !response.status().is_success() {
             // Если API недоступен, возвращаем моковые данные
             return self.get_mock_solar_wind_data();
@@ -93,7 +89,7 @@ impl SolarService {
                 return self.get_mock_solar_wind_data();
             }
         };
-        
+
         // Берем последние доступные данные
         if let Some(latest_data) = noaa_data.data.last() {
             let speed = latest_data.speed.unwrap_or(400.0);
@@ -117,7 +113,7 @@ impl SolarService {
     pub async fn get_geomagnetic_data(&self) -> Result<GeomagneticData> {
         // Получаем реальные данные Kp индекса от NOAA
         let url = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
-        
+
         let response = match reqwest::get(url).await {
             Ok(resp) => resp,
             Err(_) => {
@@ -125,7 +121,7 @@ impl SolarService {
                 return self.get_mock_geomagnetic_data();
             }
         };
-        
+
         if !response.status().is_success() {
             // Если API недоступен, возвращаем моковые данные
             return self.get_mock_geomagnetic_data();
@@ -138,7 +134,7 @@ impl SolarService {
                 return self.get_mock_geomagnetic_data();
             }
         };
-        
+
         // Берем последние доступные данные Kp
         if let Some(latest_kp) = kp_data.data.last() {
             let kp_index = latest_kp.kp_index.unwrap_or(2.0);
@@ -261,43 +257,47 @@ impl SolarService {
     }
 }
 
-pub fn print_aurora_forecast(forecast: &AuroraForecast, solar_wind: &SolarWindData, geomagnetic: &GeomagneticData) {
-    println!("\n{}", "=== ПРОГНОЗ СЕВЕРНЫХ СИЯНИЙ ===".bold().purple());
-
-    // Показываем текущие данные
-    println!("\n{}:", "ТЕКУЩИЕ ДАННЫЕ".bold().cyan());
-    println!("  🌪️  Скорость солнечного ветра: {:.0} км/с", solar_wind.speed);
-    println!("  📊 Плотность плазмы: {:.1} частиц/см³", solar_wind.density);
-    println!("  🌡️  Температура плазмы: {:.0} К", solar_wind.temperature);
-    println!("  🧲 Магнитное поле: {:.1} нТл", solar_wind.magnetic_field);
-    println!("  📈 Kp индекс: {:.1}", geomagnetic.kp_index);
-    println!("  ☢️  Солнечная радиация: {:.0} SFU", geomagnetic.solar_radiation);
-
-    println!(
-        "\n{}: {:.1}%",
-        "Вероятность видимости".bold(),
-        forecast.visibility_probability * 100.0
+pub fn print_aurora_forecast(forecast: &AuroraForecast, _solar_wind: &SolarWindData, geomagnetic: &GeomagneticData) {
+    print!("Сияние: Kp={:.1} | Вероятн: {:.0}% | {} | Лучшие: ",
+        geomagnetic.kp_index,
+        forecast.visibility_probability * 100.0,
+        forecast.intensity
     );
-    println!("{}: {}", "Интенсивность".bold(), forecast.intensity);
-
+    
+    // Сжимаем лучшие часы до интервалов
     if !forecast.best_viewing_hours.is_empty() {
-        println!("\n{}:", "Лучшие часы для наблюдения".bold().cyan());
-        for hour in &forecast.best_viewing_hours {
-            println!("  🌙 {}:00", hour);
+        let mut intervals = Vec::new();
+        let mut start = forecast.best_viewing_hours[0];
+        let mut end = start;
+        
+        for &hour in &forecast.best_viewing_hours[1..] {
+            if hour == end + 1 {
+                end = hour;
+            } else {
+                if start == end {
+                    intervals.push(format!("{:02}:00", start));
+                } else {
+                    intervals.push(format!("{:02}:00-{:02}:00", start, end));
+                }
+                start = hour;
+                end = hour;
+            }
+        }
+        // Добавляем последний интервал
+        if start == end {
+            intervals.push(format!("{:02}:00", start));
+        } else {
+            intervals.push(format!("{:02}:00-{:02}:00", start, end));
+        }
+        
+        // Показываем только первые 2 интервала
+        for interval in intervals.iter().take(2) {
+            print!("{} ", interval);
         }
     }
-
+    
     if !forecast.recommendations.is_empty() {
-        println!("\n{}:", "Рекомендации".bold().green());
-        for rec in &forecast.recommendations {
-            println!("  ✓ {}", rec);
-        }
+        print!("| {}", forecast.recommendations[0]);
     }
-
-    if !forecast.concerns.is_empty() {
-        println!("\n{}:", "Предупреждения".bold().red());
-        for concern in &forecast.concerns {
-            println!("  ⚠ {}", concern);
-        }
-    }
+    println!();
 }
