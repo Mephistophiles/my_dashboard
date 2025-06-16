@@ -17,15 +17,11 @@ test:
 
 # Проверка покрытия кода (HTML отчет)
 coverage:
-    cargo tarpaulin --out Html --target-dir target/tarpaulin
+    cargo tarpaulin --out Html --out Xml --target-dir target/tarpaulin
 
 # Проверка покрытия с порогом 55%
 coverage-strict:
-    cargo tarpaulin --out Html --fail-under 55 --target-dir target/tarpaulin
-
-# Проверка покрытия с подробным отчетом
-coverage-detail:
-    cargo tarpaulin --out Html --out Xml --target-dir target/tarpaulin
+    cargo tarpaulin --out Html --out Xml --fail-under 55 --target-dir target/tarpaulin
 
 # Форматирование кода
 fmt:
