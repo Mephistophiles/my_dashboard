@@ -4,6 +4,8 @@
   # https://devenv.sh/basics/
   env.GREET = "my_dashboard";
 
+  dotenv.enable = true;
+
   # https://devenv.sh/packages/
   packages = [ pkgs.git pkgs.just ];
 
