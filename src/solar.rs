@@ -33,10 +33,10 @@
 //! }
 //! ```
 
+use crate::{get_current_utc_time, is_demo_mode};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::{is_demo_mode, get_current_utc_time};
 
 /// Данные о солнечном ветре
 ///

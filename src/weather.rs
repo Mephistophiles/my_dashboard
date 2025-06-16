@@ -32,11 +32,11 @@
 //! // }
 //! ```
 
+use crate::{get_current_utc_time, is_demo_mode};
 use anyhow::Result;
 use chrono::{DateTime, Timelike, Utc};
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
-use crate::{get_current_utc_time, is_demo_mode};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WeatherData {

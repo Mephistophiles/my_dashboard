@@ -34,9 +34,9 @@
 //! }
 //! ```
 
+use crate::{get_current_time, is_demo_mode};
 use chrono::{DateTime, Datelike, Local, NaiveDate};
 use sunrise::{Coordinates, SolarDay, SolarEvent};
-use crate::{get_current_time, is_demo_mode};
 
 /// Информация о времени восхода, заката, золотого и синего часа
 #[derive(Debug, Clone)]
@@ -132,8 +132,12 @@ impl GoldenHourService {
         let coords = Coordinates::new(self.latitude, self.longitude).expect("Invalid coordinates");
 
         // Создаем дату
-        let naive_date =
-            NaiveDate::from_ymd_opt(calculation_date.year(), calculation_date.month(), calculation_date.day()).expect("Invalid date");
+        let naive_date = NaiveDate::from_ymd_opt(
+            calculation_date.year(),
+            calculation_date.month(),
+            calculation_date.day(),
+        )
+        .expect("Invalid date");
 
         // Создаем солнечный день
         let solar_day = SolarDay::new(coords, naive_date);
@@ -256,7 +260,9 @@ impl GoldenHourService {
             && calculation_time <= golden_hours.golden_hour_evening_end
         {
             "Золотой час (вечер)".to_string()
-        } else if calculation_time >= golden_hours.sunrise && calculation_time <= golden_hours.sunset {
+        } else if calculation_time >= golden_hours.sunrise
+            && calculation_time <= golden_hours.sunset
+        {
             "Дневное время".to_string()
         } else {
             "Ночное время".to_string()
