@@ -7,7 +7,7 @@
   dotenv.enable = true;
 
   # https://devenv.sh/packages/
-  packages = [ pkgs.git pkgs.just ];
+  packages = [ pkgs.git pkgs.just pkgs.cargo-tarpaulin ];
 
   # https://devenv.sh/languages/
   languages.rust.enable = true;
