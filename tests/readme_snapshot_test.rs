@@ -43,11 +43,7 @@ fn test_readme_output_matches_demo() {
     let demo_section = extract_demo_section_from_readme(&readme_content);
 
     if let Some(expected_output) = demo_section {
-        // Нормализуем выводы для сравнения (убираем лишние пробелы, переносы)
-        let normalized_actual = normalize_output(&actual_output);
-        let normalized_expected = normalize_output(&expected_output);
-
-        if normalized_actual != normalized_expected {
+        if actual_output != expected_output {
             println!("=== РАЗЛИЧИЯ В ВЫВОДЕ ===");
             println!("ОЖИДАЕМЫЙ (из README.md):");
             println!("{}", expected_output);
@@ -56,7 +52,7 @@ fn test_readme_output_matches_demo() {
         }
 
         assert_eq!(
-            normalized_actual, normalized_expected,
+            actual_output, expected_output,
             "Вывод main не соответствует примеру в README.md"
         );
     } else {
@@ -79,15 +75,4 @@ fn extract_demo_section_from_readme(content: &str) -> Option<String> {
         snippet = snippet.trim_end_matches("```").trim_end();
     }
     Some(snippet.to_string())
-}
-
-fn normalize_output(output: &str) -> String {
-    let time_re = Regex::new(r"\b\d{2}:\d{2}\b").unwrap();
-    output
-        .lines()
-        .map(|line| line.trim())
-        .filter(|line| !line.is_empty())
-        .map(|line| time_re.replace_all(line, "00:00").to_string())
-        .collect::<Vec<_>>()
-        .join("\n")
 }

@@ -36,6 +36,7 @@ use anyhow::Result;
 use chrono::{DateTime, Timelike, Utc};
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
+use crate::{get_current_utc_time, is_demo_mode};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WeatherData {
@@ -96,10 +97,7 @@ impl WeatherService {
         debug!("Создание WeatherService для города: {}", city);
 
         // Проверяем DEMO режим
-        let demo_mode = std::env::var("DEMO_MODE")
-            .unwrap_or_else(|_| "false".to_string())
-            .to_lowercase()
-            == "true";
+        let demo_mode = is_demo_mode();
 
         if demo_mode {
             warn!("Включен DEMO режим - используются демонстрационные данные");
@@ -257,6 +255,9 @@ impl WeatherService {
         // Моковые данные для демонстрации (только в DEMO режиме)
         let mut forecast = WeatherForecast { hourly: Vec::new() };
 
+        // Используем фиксированное время для стабильности тестов
+        let base_time = get_current_utc_time();
+
         for hour in 0..24 {
             let weather_data = WeatherData {
                 temperature: 15.0 + (hour as f64 * 0.5) - 6.0, // Температура от 9 до 21 градуса
@@ -277,7 +278,7 @@ impl WeatherService {
                     18..=20 => "Закат".to_string(),
                     _ => "Ночь".to_string(),
                 },
-                timestamp: Utc::now() + chrono::Duration::hours(hour),
+                timestamp: base_time + chrono::Duration::hours(hour),
             };
             forecast.hourly.push(weather_data);
         }
