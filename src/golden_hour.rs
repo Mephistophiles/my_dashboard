@@ -34,6 +34,7 @@
 //! }
 //! ```
 
+use crate::{get_current_time, is_demo_mode};
 use chrono::{DateTime, Datelike, Local, NaiveDate};
 use sunrise::{Coordinates, SolarDay, SolarEvent};
 
@@ -117,12 +118,26 @@ impl GoldenHourService {
     /// println!("Закат: {}", info.sunset.format("%H:%M"));
     /// ```
     pub fn calculate_golden_hours(&self, date: DateTime<Local>) -> GoldenHourInfo {
+        // В DEMO режиме используем фиксированную дату для стабильности тестов
+        let demo_mode = is_demo_mode();
+
+        let calculation_date = if demo_mode {
+            // Используем фиксированную дату для стабильности (ночное время)
+            get_current_time()
+        } else {
+            date
+        };
+
         // Создаем координаты
         let coords = Coordinates::new(self.latitude, self.longitude).expect("Invalid coordinates");
 
         // Создаем дату
-        let naive_date =
-            NaiveDate::from_ymd_opt(date.year(), date.month(), date.day()).expect("Invalid date");
+        let naive_date = NaiveDate::from_ymd_opt(
+            calculation_date.year(),
+            calculation_date.month(),
+            calculation_date.day(),
+        )
+        .expect("Invalid date");
 
         // Создаем солнечный день
         let solar_day = SolarDay::new(coords, naive_date);
@@ -216,26 +231,38 @@ impl GoldenHourService {
     /// println!("Текущие условия: {}", condition);
     /// ```
     pub fn get_current_lighting_condition(&self, current_time: DateTime<Local>) -> String {
-        let golden_hours = self.calculate_golden_hours(current_time);
+        // В DEMO режиме используем фиксированное время для стабильности тестов
+        let demo_mode = is_demo_mode();
+
+        let calculation_time = if demo_mode {
+            // Используем фиксированное время для стабильности (ночное время)
+            get_current_time()
+        } else {
+            current_time
+        };
+
+        let golden_hours = self.calculate_golden_hours(calculation_time);
 
         // Сначала проверяем синий час
-        if current_time >= golden_hours.blue_hour_morning_start
-            && current_time <= golden_hours.blue_hour_morning_end
+        if calculation_time >= golden_hours.blue_hour_morning_start
+            && calculation_time <= golden_hours.blue_hour_morning_end
         {
             "Синий час (утро)".to_string()
-        } else if current_time >= golden_hours.blue_hour_evening_start
-            && current_time <= golden_hours.blue_hour_evening_end
+        } else if calculation_time >= golden_hours.blue_hour_evening_start
+            && calculation_time <= golden_hours.blue_hour_evening_end
         {
             "Синий час (вечер)".to_string()
-        } else if current_time >= golden_hours.golden_hour_morning_start
-            && current_time <= golden_hours.golden_hour_morning_end
+        } else if calculation_time >= golden_hours.golden_hour_morning_start
+            && calculation_time <= golden_hours.golden_hour_morning_end
         {
             "Золотой час (утро)".to_string()
-        } else if current_time >= golden_hours.golden_hour_evening_start
-            && current_time <= golden_hours.golden_hour_evening_end
+        } else if calculation_time >= golden_hours.golden_hour_evening_start
+            && calculation_time <= golden_hours.golden_hour_evening_end
         {
             "Золотой час (вечер)".to_string()
-        } else if current_time >= golden_hours.sunrise && current_time <= golden_hours.sunset {
+        } else if calculation_time >= golden_hours.sunrise
+            && calculation_time <= golden_hours.sunset
+        {
             "Дневное время".to_string()
         } else {
             "Ночное время".to_string()
@@ -261,7 +288,16 @@ impl GoldenHourService {
 /// print_golden_hour_info(&service);
 /// ```
 pub fn print_golden_hour_info(service: &GoldenHourService) {
-    let current_time = chrono::Local::now();
+    // В DEMO режиме используем фиксированное время для стабильности тестов
+    let demo_mode = is_demo_mode();
+
+    let current_time = if demo_mode {
+        // Используем фиксированное время для стабильности (ночное время)
+        get_current_time()
+    } else {
+        chrono::Local::now()
+    };
+
     let info = service.calculate_golden_hours(current_time);
     let current_condition = service.get_current_lighting_condition(current_time);
 

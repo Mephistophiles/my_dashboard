@@ -33,6 +33,7 @@
 //! }
 //! ```
 
+use crate::{get_current_utc_time, is_demo_mode};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -129,6 +130,20 @@ struct KpRecord {
 /// }
 /// ```
 pub async fn fetch_solar_wind_data() -> Result<SolarWindData> {
+    // Проверяем DEMO режим
+    let demo_mode = is_demo_mode();
+
+    if demo_mode {
+        // Возвращаем статические данные для DEMO режима
+        return Ok(SolarWindData {
+            speed: 719.3,
+            density: 4.1,
+            temperature: 490479.0,
+            magnetic_field: None,
+            timestamp: get_current_utc_time(),
+        });
+    }
+
     let url = "https://services.swpc.noaa.gov/json/ace/swepam/ace_swepam_1h.json";
     let response = reqwest::get(url).await?;
 
@@ -190,6 +205,19 @@ pub async fn fetch_solar_wind_data() -> Result<SolarWindData> {
 }
 
 pub async fn fetch_geomagnetic_data() -> Result<GeomagneticData> {
+    // Проверяем DEMO режим
+    let demo_mode = is_demo_mode();
+
+    if demo_mode {
+        // Возвращаем статические данные для DEMO режима
+        return Ok(GeomagneticData {
+            kp_index: 0.0,
+            aurora_activity: 0.0,
+            solar_radiation: None,
+            timestamp: get_current_utc_time(),
+        });
+    }
+
     let url = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
     let response = reqwest::get(url).await?;
 
@@ -338,7 +366,7 @@ mod tests {
             density: 5.0,
             temperature: 250000.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         }
     }
 
@@ -347,7 +375,7 @@ mod tests {
             kp_index: 3.0,
             aurora_activity: 4.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         }
     }
 
@@ -357,7 +385,7 @@ mod tests {
             density: 15.0, // Высокая плотность
             temperature: 300000.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         }
     }
 
@@ -366,7 +394,7 @@ mod tests {
             kp_index: 7.0, // Высокий Kp индекс
             aurora_activity: 8.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         }
     }
 
@@ -607,7 +635,7 @@ mod tests {
             density: 3.0,
             temperature: 200000.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         assert_eq!(solar_wind.speed, 400.0);
@@ -622,7 +650,7 @@ mod tests {
             kp_index: 4.5,
             aurora_activity: 6.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         assert_eq!(geomagnetic.kp_index, 4.5);
@@ -702,14 +730,14 @@ mod tests {
             density: 0.0,
             temperature: 0.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let geomagnetic = GeomagneticData {
             kp_index: 0.0,
             aurora_activity: 0.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
@@ -721,14 +749,14 @@ mod tests {
             density: 20.0,
             temperature: 500000.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let geomagnetic_max = GeomagneticData {
             kp_index: 9.0,
             aurora_activity: 10.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let activity_max = calculate_aurora_activity(&solar_wind_max, &geomagnetic_max);
@@ -816,7 +844,7 @@ mod tests {
             density: 50.0,               // Очень высокая плотность
             temperature: 1000000.0,      // Очень высокая температура
             magnetic_field: Some(100.0), // С магнитным полем
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         assert_eq!(extreme_solar_wind.speed, 2000.0);
@@ -830,7 +858,7 @@ mod tests {
             density: 0.1,
             temperature: 1000.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         assert_eq!(min_solar_wind.speed, 1.0);
@@ -846,7 +874,7 @@ mod tests {
             kp_index: 9.0,                 // Максимальный Kp индекс
             aurora_activity: 10.0,         // Максимальная активность
             solar_radiation: Some(1000.0), // С солнечной радиацией
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         assert_eq!(extreme_geomagnetic.kp_index, 9.0);
@@ -858,7 +886,7 @@ mod tests {
             kp_index: 0.0,
             aurora_activity: 0.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         assert_eq!(min_geomagnetic.kp_index, 0.0);
@@ -874,14 +902,14 @@ mod tests {
             density: 10.0, // Высокая плотность
             temperature: 250000.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let geomagnetic = GeomagneticData {
             kp_index: 5.0, // Средний Kp индекс
             aurora_activity: 6.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
@@ -915,14 +943,14 @@ mod tests {
             density: 15.0, // Очень высокая плотность
             temperature: 300000.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let geomagnetic = GeomagneticData {
             kp_index: 7.0, // Высокий Kp индекс
             aurora_activity: 8.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
@@ -937,14 +965,14 @@ mod tests {
             density: 20.0,
             temperature: 500000.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let geomagnetic = GeomagneticData {
             kp_index: 9.0,
             aurora_activity: 10.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let activity = calculate_aurora_activity(&solar_wind, &geomagnetic);
@@ -979,14 +1007,14 @@ mod tests {
             density: 8.0,
             temperature: 250000.0,
             magnetic_field: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         let geomagnetic = GeomagneticData {
             kp_index: 4.0,
             aurora_activity: 5.0,
             solar_radiation: None,
-            timestamp: Utc::now(),
+            timestamp: get_current_utc_time(),
         };
 
         // Проверяем компоненты формулы

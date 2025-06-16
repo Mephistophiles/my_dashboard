@@ -1,0 +1,7 @@
+# Эти люди будут автоматически запрашиваться для ревью всех изменений
+* @Mephistophiles
+
+# Специфичные правила для определенных файлов/папок
+# /src/weather.rs @weather-expert
+# /src/solar.rs @solar-expert
+# /tests/ @test-expert

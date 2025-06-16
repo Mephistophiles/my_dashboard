@@ -1,3 +1,4 @@
 - [x] Add github actions file
+- [x] Configure CI with Just commands and blocking coverage check
 - [ ] Do not http get in test mode
 - [ ] Do not get real time in test mode
