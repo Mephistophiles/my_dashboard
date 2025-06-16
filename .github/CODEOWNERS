@@ -1,11 +1,7 @@
 # Эти люди будут автоматически запрашиваться для ревью всех изменений
-* @maintainer1 @maintainer2
+* @Mephistophiles
 
 # Специфичные правила для определенных файлов/папок
 # /src/weather.rs @weather-expert
 # /src/solar.rs @solar-expert
 # /tests/ @test-expert
-
-# Документация
-*.md @docs-team
-.github/ @devops-team 
