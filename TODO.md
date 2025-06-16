@@ -1,3 +1,3 @@
-- [ ] Add github actions file
+- [x] Add github actions file
 - [ ] Do not http get in test mode
 - [ ] Do not get real time in test mode
