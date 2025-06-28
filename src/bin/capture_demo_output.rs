@@ -1,15 +1,7 @@
-use std::env;
 use std::fs;
 use std::process::Command;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Устанавливаем DEMO режим
-    env::set_var("DEMO_MODE", "true");
-    env::set_var("OPENWEATHER_API_KEY", "demo_key");
-    env::set_var("CITY", "Moscow");
-    env::set_var("LATITUDE", "55.7558");
-    env::set_var("LONGITUDE", "37.6176");
-
     // Запускаем main и захватываем вывод
     let output = Command::new("cargo")
         .args(["run", "--bin", "my_dashboard"])
@@ -18,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .env("CITY", "Moscow")
         .env("LATITUDE", "55.7558")
         .env("LONGITUDE", "37.6176")
-        .env("RUST_LOG", "error") // Убираем логи для чистого вывода
+        .env("RUST_LOG", "debug") // Убираем логи для чистого вывода
         .output()?;
 
     if output.status.success() {

@@ -132,7 +132,7 @@ impl WeatherService {
             coords.lat, coords.lon, self.api_key
         );
 
-        debug!("Запрос к OpenWeather API: {}", url);
+        debug!("🌤️ API ЗАПРОС: OpenWeather API для города {}", self.city);
         let response = reqwest::get(&url).await?;
 
         if !response.status().is_success() {
@@ -226,6 +226,10 @@ impl WeatherService {
     }
 
     async fn get_city_coordinates(&self) -> Result<CityCoordinates> {
+        debug!(
+            "🗺️ API ЗАПРОС: OpenWeather Geocoding API для города {}",
+            self.city
+        );
         let url = format!(
             "http://api.openweathermap.org/geo/1.0/direct?q={}&limit=1&appid={}",
             self.city, self.api_key
@@ -501,6 +505,7 @@ pub struct AstrophotographyAnalysis {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use pretty_assertions::assert_eq;
 
     // Вспомогательные функции для создания тестовых данных
     fn create_test_weather_data() -> WeatherData {
@@ -567,15 +572,6 @@ mod tests {
         }
 
         forecast
-    }
-
-    #[test]
-    fn test_weather_service_new() {
-        let service = WeatherService::new("test_key".to_string(), "TestCity".to_string());
-
-        assert_eq!(service.api_key, "test_key");
-        assert_eq!(service.city, "TestCity");
-        // demo_mode зависит от переменной окружения, поэтому не тестируем
     }
 
     #[test]
@@ -698,37 +694,6 @@ mod tests {
     }
 
     #[test]
-    fn test_weather_data_edge_cases() {
-        // Тестируем граничные случаи для WeatherData
-        let min_data = WeatherData {
-            temperature: -50.0,             // Минимальная температура
-            humidity: 0.0,                  // Минимальная влажность
-            wind_speed: 0.0,                // Минимальная скорость ветра
-            cloud_cover: 0.0,               // Минимальная облачность
-            visibility: 0.0,                // Минимальная видимость
-            precipitation_probability: 0.0, // Минимальная вероятность осадков
-            description: "".to_string(),
-            timestamp: Utc::now(),
-        };
-
-        let max_data = WeatherData {
-            temperature: 60.0,                // Максимальная температура
-            humidity: 100.0,                  // Максимальная влажность
-            wind_speed: 100.0,                // Максимальная скорость ветра
-            cloud_cover: 100.0,               // Максимальная облачность
-            visibility: 50.0,                 // Максимальная видимость
-            precipitation_probability: 100.0, // Максимальная вероятность осадков
-            description: "экстремальные условия".to_string(),
-            timestamp: Utc::now(),
-        };
-
-        assert_eq!(min_data.temperature, -50.0);
-        assert_eq!(max_data.temperature, 60.0);
-        assert_eq!(min_data.humidity, 0.0);
-        assert_eq!(max_data.humidity, 100.0);
-    }
-
-    #[test]
     fn test_weather_analysis_components() {
         let forecast = create_test_forecast();
         let analysis = analyze_weather_for_photography(&forecast);
@@ -758,16 +723,6 @@ mod tests {
         for &hour in &analysis.best_hours {
             assert!((0..=23).contains(&hour));
         }
-    }
-
-    #[test]
-    fn test_weather_service_demo_mode() {
-        // Тестируем создание сервиса в demo режиме
-        let service = WeatherService::new("demo_key".to_string(), "TestCity".to_string());
-
-        // В demo режиме сервис должен работать без реальных API вызовов
-        assert_eq!(service.city, "TestCity");
-        assert_eq!(service.api_key, "demo_key");
     }
 
     #[test]

@@ -1,5 +1,5 @@
 // use regex::Regex;
-use std::env;
+use pretty_assertions::assert_eq;
 use std::fs;
 use std::process::Command;
 
@@ -10,13 +10,6 @@ fn test_readme_output_matches_demo() {
         eprintln!("Skipped on CI");
         return;
     }
-    // Устанавливаем DEMO режим
-    env::set_var("DEMO_MODE", "true");
-    env::set_var("OPENWEATHER_API_KEY", "demo_key");
-    env::set_var("CITY", "Moscow");
-    env::set_var("LATITUDE", "55.7558");
-    env::set_var("LONGITUDE", "37.6176");
-
     // Запускаем main и захватываем вывод
     let output = Command::new("cargo")
         .args(["run", "--bin", "my_dashboard"])
@@ -48,14 +41,6 @@ fn test_readme_output_matches_demo() {
     let demo_section = extract_demo_section_from_readme(&readme_content);
 
     if let Some(expected_output) = demo_section {
-        if actual_output != expected_output {
-            println!("=== РАЗЛИЧИЯ В ВЫВОДЕ ===");
-            println!("ОЖИДАЕМЫЙ (из README.md):");
-            println!("{}", expected_output);
-            println!("\nФАКТИЧЕСКИЙ (из main):");
-            println!("{}", actual_output);
-        }
-
         assert_eq!(
             actual_output, expected_output,
             "Вывод main не соответствует примеру в README.md"

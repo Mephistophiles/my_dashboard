@@ -17,7 +17,6 @@
 //!
 //! // Создаем дашборд
 //! let dashboard = PhotographyDashboard::new(
-//!     "your_api_key".to_string(),
 //!     "Moscow".to_string(),
 //!     55.7558,
 //!     37.6176,
@@ -48,6 +47,8 @@ pub mod weather;
 
 use anyhow::Result;
 use chrono::{DateTime, Local, Utc};
+use log::debug;
+use solar::AuroraForecast;
 use std::env;
 
 // Структуры для хранения строк вместо принтов
@@ -104,37 +105,7 @@ pub struct DashboardOutput {
     pub tips_output: PhotographyTipsOutput,
 }
 
-// Функции для обработки бизнес-логики
-pub async fn process_weather_data(
-    api_key: String,
-    city: String,
-) -> Result<(f64, WeatherOutput, AstrophotographyOutput)> {
-    let weather_service = weather::WeatherService::new(api_key, city);
-    let forecast = weather_service.get_weather_forecast().await?;
-
-    let analysis = weather::analyze_weather_for_photography(&forecast);
-    let weather_score = analysis.overall_score;
-
-    let weather_output = generate_weather_output(&forecast, &analysis);
-    let astrophotography_output = generate_astrophotography_output(&forecast);
-
-    Ok((weather_score, weather_output, astrophotography_output))
-}
-
-pub async fn process_solar_data() -> Result<(f64, SolarOutput)> {
-    let solar_output = generate_solar_output().await?;
-    let aurora_probability = solar_output
-        .aurora_forecast
-        .split_whitespace()
-        .find(|s| s.ends_with('%'))
-        .and_then(|s| s.trim_end_matches('%').parse::<f64>().ok())
-        .map(|p| p / 100.0)
-        .unwrap_or(0.0);
-
-    Ok((aurora_probability, solar_output))
-}
-
-pub fn process_golden_hour(latitude: f64, longitude: f64) -> (bool, GoldenHourOutput) {
+fn process_golden_hour(latitude: f64, longitude: f64) -> (bool, GoldenHourOutput) {
     let golden_hour_service = golden_hour::GoldenHourService::new(latitude, longitude);
     let is_golden_hour = golden_hour_service.is_golden_hour();
     let golden_hour_output = generate_golden_hour_output(&golden_hour_service);
@@ -142,7 +113,7 @@ pub fn process_golden_hour(latitude: f64, longitude: f64) -> (bool, GoldenHourOu
     (is_golden_hour, golden_hour_output)
 }
 
-pub fn process_photography_tips(
+fn process_photography_tips(
     weather_score: f64,
     is_golden_hour: bool,
     aurora_probability: f64,
@@ -167,23 +138,39 @@ pub async fn generate_dashboard_output(
     latitude: f64,
     longitude: f64,
 ) -> Result<DashboardOutput, anyhow::Error> {
+    debug!("🚀 ГЕНЕРАЦИЯ ДАШБОРДА: начало для города {}", city);
+
+    // Получаем данные о погоде один раз
+    let weather_service = weather::WeatherService::new(api_key.clone(), city.clone());
+    let weather_forecast = weather_service.get_weather_forecast().await?;
+
+    // Получаем солнечные данные один раз
+    let aurora_forecast = solar::predict_aurora().await?;
+    let aurora_probability = aurora_forecast.visibility_probability;
+    let solar_output = generate_solar_output(aurora_forecast).await?;
+
     // Создаем дашборд
-    let dashboard =
-        dashboard::PhotographyDashboard::new(api_key.clone(), city.clone(), latitude, longitude);
-    let summary = dashboard.generate_dashboard().await?;
+    let dashboard = dashboard::PhotographyDashboard::new(city.clone(), latitude, longitude);
+    let summary = dashboard
+        .generate_dashboard(&weather_forecast, aurora_probability)
+        .await?;
 
-    // Обрабатываем данные погоды
-    let (weather_score, weather_output, astrophotography_output) =
-        process_weather_data(api_key.clone(), city.clone()).await?;
-
-    // Обрабатываем солнечные данные
-    let (aurora_probability, solar_output) = process_solar_data().await?;
+    // Анализируем погоду (без повторного запроса)
+    let weather_analysis = weather::analyze_weather_for_photography(&weather_forecast);
+    let weather_output = generate_weather_output(&weather_forecast, &weather_analysis);
+    let astrophotography_output = generate_astrophotography_output(&weather_forecast);
 
     // Обрабатываем золотой час
     let (is_golden_hour, golden_hour_output) = process_golden_hour(latitude, longitude);
 
     // Обрабатываем советы
-    let tips_output = process_photography_tips(weather_score, is_golden_hour, aurora_probability);
+    let tips_output = process_photography_tips(
+        weather_analysis.overall_score,
+        is_golden_hour,
+        aurora_probability,
+    );
+
+    debug!("✅ ГЕНЕРАЦИЯ ДАШБОРДА: завершена для города {}", city);
 
     Ok(DashboardOutput {
         summary,
@@ -354,98 +341,62 @@ fn generate_astrophotography_output(forecast: &weather::WeatherForecast) -> Astr
     }
 }
 
-async fn generate_solar_output() -> Result<SolarOutput> {
-    // Проверяем DEMO режим для использования фиксированного времени
-    let demo_mode = is_demo_mode();
+async fn generate_solar_output(aurora_forecast: AuroraForecast) -> Result<SolarOutput> {
+    let solar_wind = format!(
+        "🌞 Солнечный ветер: 💨{:.1}км/с  📊{:.1}частиц/см³  🌡️{:.0}K  🕐{}",
+        aurora_forecast.solar_wind.speed,
+        aurora_forecast.solar_wind.density,
+        aurora_forecast.solar_wind.temperature,
+        aurora_forecast.solar_wind.timestamp.format("%H:%M")
+    );
 
-    let solar_wind = match solar::fetch_solar_wind_data().await {
-        Ok(data) => {
-            let timestamp = if demo_mode {
-                get_current_utc_time()
+    let geomagnetic = format!(
+        "🌍 Геомагнитные данные: 🧲Kp {:.1}  🌌Активность сияний {:.1}/10  🕐{}",
+        aurora_forecast.geomagnetic.kp_index,
+        aurora_forecast.geomagnetic.aurora_activity,
+        aurora_forecast.geomagnetic.timestamp.format("%H:%M")
+    );
+
+    let forecast_str = format!(
+        "🌌 Прогноз северных сияний: {}%  📊{}  💡{}",
+        (aurora_forecast.visibility_probability * 100.0) as i32,
+        aurora_forecast.intensity_level,
+        aurora_forecast.conditions
+    );
+    let hours_str = if !aurora_forecast.best_viewing_hours.is_empty() {
+        let mut intervals = Vec::new();
+        let mut start = aurora_forecast.best_viewing_hours[0];
+        let mut end = start;
+
+        for &hour in &aurora_forecast.best_viewing_hours[1..] {
+            if hour == end + 1 {
+                end = hour;
             } else {
-                data.timestamp
-            };
-
-            format!(
-                "🌞 Солнечный ветер: 💨{:.1}км/с  📊{:.1}частиц/см³  🌡️{:.0}K  🕐{}",
-                data.speed,
-                data.density,
-                data.temperature,
-                timestamp.format("%H:%M")
-            )
-        }
-        Err(e) => format!("❌ Ошибка получения данных солнечного ветра: {}", e),
-    };
-
-    let geomagnetic = match solar::fetch_geomagnetic_data().await {
-        Ok(data) => {
-            let timestamp = if demo_mode {
-                get_current_utc_time()
-            } else {
-                data.timestamp
-            };
-
-            format!(
-                "🌍 Геомагнитные данные: 🧲Kp {:.1}  🌌Активность сияний {:.1}/10  🕐{}",
-                data.kp_index,
-                data.aurora_activity,
-                timestamp.format("%H:%M")
-            )
-        }
-        Err(e) => format!("❌ Ошибка получения геомагнитных данных: {}", e),
-    };
-
-    let (aurora_forecast, best_viewing_hours) = match solar::predict_aurora().await {
-        Ok(forecast) => {
-            let forecast_str = format!(
-                "🌌 Прогноз северных сияний: {}%  📊{}  💡{}",
-                (forecast.visibility_probability * 100.0) as i32,
-                forecast.intensity_level,
-                forecast.conditions
-            );
-
-            let hours_str = if !forecast.best_viewing_hours.is_empty() {
-                let mut intervals = Vec::new();
-                let mut start = forecast.best_viewing_hours[0];
-                let mut end = start;
-
-                for &hour in &forecast.best_viewing_hours[1..] {
-                    if hour == end + 1 {
-                        end = hour;
-                    } else {
-                        if start == end {
-                            intervals.push(format!("{:02}:00", start));
-                        } else {
-                            intervals.push(format!("{:02}:00-{:02}:00", start, end));
-                        }
-                        start = hour;
-                        end = hour;
-                    }
-                }
                 if start == end {
                     intervals.push(format!("{:02}:00", start));
                 } else {
                     intervals.push(format!("{:02}:00-{:02}:00", start, end));
                 }
-
-                format!("🕐 Лучшие часы для наблюдения: {}", intervals.join(", "))
-            } else {
-                String::new()
-            };
-
-            (forecast_str, hours_str)
+                start = hour;
+                end = hour;
+            }
         }
-        Err(e) => (
-            format!("❌ Ошибка прогноза северных сияний: {}", e),
-            String::new(),
-        ),
+        if start == end {
+            intervals.push(format!("{:02}:00", start));
+        } else {
+            intervals.push(format!("{:02}:00-{:02}:00", start, end));
+        }
+
+        format!("🕐 Лучшие часы для наблюдения: {}", intervals.join(", "))
+    } else {
+        String::new()
     };
 
     Ok(SolarOutput {
         solar_wind,
         geomagnetic,
-        aurora_forecast,
-        best_viewing_hours,
+        aurora_forecast: forecast_str,
+        best_viewing_hours: hours_str,
     })
 }
 
@@ -514,166 +465,6 @@ pub fn validate_coordinates(latitude: f64, longitude: f64) -> bool {
     (-90.0..=90.0).contains(&latitude) && (-180.0..=180.0).contains(&longitude)
 }
 
-/// Форматирует вывод дашборда в строку для snapshot testing
-pub fn format_dashboard_output(output: &DashboardOutput) -> String {
-    let mut result = String::new();
-
-    // Основная сводка
-    result.push_str("=== ФОТОГРАФИЧЕСКИЙ ДАШБОРД ===\n");
-    result.push_str("📊 ОБЩАЯ ОЦЕНКА\n");
-    result.push_str(&format!(
-        "   Погода: {:.1}/10\n",
-        output.summary.weather_score
-    ));
-    result.push_str(&format!(
-        "   Вероятность северных сияний: {:.0}%\n",
-        output.summary.aurora_probability * 100.0
-    ));
-    result.push_str(&format!(
-        "   Золотой час: {}\n",
-        if output.summary.is_golden_hour_today {
-            "Да"
-        } else {
-            "Нет"
-        }
-    ));
-
-    if !output.summary.best_shooting_hours.is_empty() {
-        result.push_str(&format!(
-            "   Лучшие часы: {}\n",
-            output
-                .summary
-                .best_shooting_hours
-                .iter()
-                .map(|h| format!("{:02}:00", h))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-    }
-
-    if !output.summary.key_highlights.is_empty() {
-        result.push_str("✨ КЛЮЧЕВЫЕ МОМЕНТЫ\n");
-        for highlight in &output.summary.key_highlights {
-            result.push_str(&format!("   • {}\n", highlight));
-        }
-    }
-
-    if !output.summary.warnings.is_empty() {
-        result.push_str("⚠️ ПРЕДУПРЕЖДЕНИЯ\n");
-        for warning in &output.summary.warnings {
-            result.push_str(&format!("   • {}\n", warning));
-        }
-    }
-
-    result.push_str("🎯 РЕКОМЕНДАЦИЯ\n");
-    result.push_str(&format!("   {}\n", output.summary.overall_recommendation));
-
-    // Детальная информация
-    result.push_str("\n📊 ДЕТАЛЬНАЯ ИНФОРМАЦИЯ\n");
-    result.push_str(&format!("{}\n", output.weather_output.current_weather));
-    result.push_str(&format!(
-        "{}  {}  | ⭐ Оценка: {:.1}/10\n",
-        output.weather_output.temperature_range,
-        output.weather_output.best_hours,
-        output.weather_output.overall_score
-    ));
-
-    if !output.weather_output.recommendation.is_empty() {
-        result.push_str(&output.weather_output.recommendation);
-    }
-    if !output.weather_output.concerns.is_empty() {
-        result.push_str(&format!(" | {}", output.weather_output.concerns));
-    }
-    result.push('\n');
-
-    // Астрофотография
-    result.push_str(&format!(
-        "🌌 Астрофото: {} | ☁️{:.0}% | ",
-        if output.astrophotography_output.is_suitable {
-            "✅"
-        } else {
-            "❌"
-        },
-        output.astrophotography_output.avg_cloud_cover
-    ));
-
-    if !output.astrophotography_output.best_hours.is_empty() {
-        result.push_str(&format!("{} ", output.astrophotography_output.best_hours));
-    }
-    if !output.astrophotography_output.recommendation.is_empty() {
-        result.push_str(&format!(
-            "| {}",
-            output.astrophotography_output.recommendation
-        ));
-    }
-    result.push('\n');
-
-    // Солнечные данные
-    result.push_str(&format!("{}\n", output.solar_output.solar_wind));
-    result.push_str(&format!("{}\n", output.solar_output.geomagnetic));
-    result.push_str(&format!("{}\n", output.solar_output.aurora_forecast));
-    if !output.solar_output.best_viewing_hours.is_empty() {
-        result.push_str(&format!("   {}\n", output.solar_output.best_viewing_hours));
-    }
-
-    // Золотой час
-    result.push_str(&format!("{}\n", output.golden_hour_output.sunrise_sunset));
-    result.push_str(&format!("{}\n", output.golden_hour_output.golden_hours));
-    result.push_str(&format!("{}\n", output.golden_hour_output.blue_hours));
-    result.push_str(&format!(
-        "💡 Текущие условия освещения: {}\n",
-        output.golden_hour_output.current_condition
-    ));
-
-    // Советы
-    result.push_str("\n=== СОВЕТЫ ДЛЯ ФОТОГРАФОВ ===\n");
-
-    if !output.tips_output.equipment_recommendations.is_empty() {
-        result.push_str("\n📷 РЕКОМЕНДАЦИИ ПО ОБОРУДОВАНИЮ:\n");
-        for (i, tip) in output
-            .tips_output
-            .equipment_recommendations
-            .iter()
-            .enumerate()
-        {
-            result.push_str(&format!("{}. {}\n", i + 1, tip));
-        }
-    }
-
-    if !output.tips_output.shooting_tips.is_empty() {
-        result.push_str("\n🎯 СОВЕТЫ ПО СЪЕМКЕ:\n");
-        for (i, tip) in output.tips_output.shooting_tips.iter().enumerate() {
-            result.push_str(&format!("{}. {}\n", i + 1, tip));
-        }
-    }
-
-    if !output.tips_output.location_suggestions.is_empty() {
-        result.push_str("\n📍 РЕКОМЕНДАЦИИ ПО ЛОКАЦИЯМ:\n");
-        for (i, tip) in output.tips_output.location_suggestions.iter().enumerate() {
-            result.push_str(&format!("{}. {}\n", i + 1, tip));
-        }
-    }
-
-    if !output.tips_output.technical_settings.is_empty() {
-        result.push_str("\n⚙️ ТЕХНИЧЕСКИЕ НАСТРОЙКИ:\n");
-        for (i, tip) in output.tips_output.technical_settings.iter().enumerate() {
-            result.push_str(&format!("{}. {}\n", i + 1, tip));
-        }
-    }
-
-    result.push_str("\n=== ОБЩИЕ РЕКОМЕНДАЦИИ ===\n");
-    for (i, tip) in output
-        .tips_output
-        .general_recommendations
-        .iter()
-        .enumerate()
-    {
-        result.push_str(&format!("{}. {}\n", i + 1, tip));
-    }
-
-    result
-}
-
 /// Проверяет, включен ли DEMO режим
 ///
 /// # Возвращает
@@ -726,6 +517,7 @@ pub fn get_current_utc_time() -> DateTime<Utc> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
     use std::env;
     use tokio::runtime::Runtime;
 
@@ -733,57 +525,6 @@ mod tests {
     fn test_validate_coordinates() {
         assert!(validate_coordinates(55.7558, 37.6176));
         assert!(!validate_coordinates(100.0, 200.0));
-    }
-
-    #[test]
-    fn test_format_dashboard_output_smoke() {
-        // Минимальный мок-объект для smoke-теста
-        let output = DashboardOutput {
-            summary: dashboard::DashboardSummary {
-                overall_recommendation: "Test".to_string(),
-                weather_score: 5.0,
-                aurora_probability: 0.5,
-                is_golden_hour_today: false,
-                best_shooting_hours: vec![6, 18],
-                key_highlights: vec!["Test highlight".to_string()],
-                warnings: vec!["Test warning".to_string()],
-            },
-            weather_output: WeatherOutput {
-                current_weather: "Test weather".to_string(),
-                temperature_range: "9-20°C".to_string(),
-                best_hours: "06:00-08:00".to_string(),
-                overall_score: 5.0,
-                recommendation: "Test rec".to_string(),
-                concerns: "Test concern".to_string(),
-            },
-            astrophotography_output: AstrophotographyOutput {
-                is_suitable: false,
-                avg_cloud_cover: 50.0,
-                best_hours: "00:00".to_string(),
-                recommendation: "No astro".to_string(),
-            },
-            solar_output: SolarOutput {
-                solar_wind: "Test wind".to_string(),
-                geomagnetic: "Test geomagnetic".to_string(),
-                aurora_forecast: "Test aurora".to_string(),
-                best_viewing_hours: "22:00-23:00".to_string(),
-            },
-            golden_hour_output: GoldenHourOutput {
-                sunrise_sunset: "03:44 | 21:16".to_string(),
-                golden_hours: "04:00-06:00".to_string(),
-                blue_hours: "03:30-04:00".to_string(),
-                current_condition: "Дневное время".to_string(),
-            },
-            tips_output: PhotographyTipsOutput {
-                equipment_recommendations: vec!["Test equipment".to_string()],
-                shooting_tips: vec!["Test tip".to_string()],
-                location_suggestions: vec!["Test location".to_string()],
-                technical_settings: vec!["Test setting".to_string()],
-                general_recommendations: vec!["Test general".to_string()],
-            },
-        };
-        let formatted = format_dashboard_output(&output);
-        assert!(formatted.contains("ФОТОГРАФИЧЕСКИЙ ДАШБОРД"));
     }
 
     #[test]
@@ -818,26 +559,6 @@ mod tests {
         assert_eq!(city, "Moscow");
         assert_eq!(lat, 55.7558);
         assert_eq!(lon, 37.6176);
-    }
-
-    #[test]
-    fn test_async_wrappers() {
-        let rt = Runtime::new().unwrap();
-        // process_weather_data
-        let (weather_score, weather_output, astro_output) = rt
-            .block_on(process_weather_data(
-                "demo_key".to_string(),
-                "Moscow".to_string(),
-            ))
-            .unwrap();
-        assert!((0.0..=10.0).contains(&weather_score));
-        assert!(!weather_output.current_weather.is_empty());
-        assert!(!astro_output.recommendation.is_empty());
-
-        // process_solar_data
-        let (aurora_prob, solar_output) = rt.block_on(process_solar_data()).unwrap();
-        assert!((0.0..=1.0).contains(&aurora_prob));
-        assert!(!solar_output.solar_wind.is_empty());
     }
 
     #[test]
@@ -885,56 +606,6 @@ mod tests {
     }
 
     #[test]
-    fn test_format_dashboard_output_empty_fields() {
-        let output = DashboardOutput {
-            summary: dashboard::DashboardSummary {
-                overall_recommendation: String::new(),
-                weather_score: 0.0,
-                aurora_probability: 0.0,
-                is_golden_hour_today: false,
-                best_shooting_hours: vec![],
-                key_highlights: vec![],
-                warnings: vec![],
-            },
-            weather_output: WeatherOutput {
-                current_weather: String::new(),
-                temperature_range: String::new(),
-                best_hours: String::new(),
-                overall_score: 0.0,
-                recommendation: String::new(),
-                concerns: String::new(),
-            },
-            astrophotography_output: AstrophotographyOutput {
-                is_suitable: false,
-                avg_cloud_cover: 0.0,
-                best_hours: String::new(),
-                recommendation: String::new(),
-            },
-            solar_output: SolarOutput {
-                solar_wind: String::new(),
-                geomagnetic: String::new(),
-                aurora_forecast: String::new(),
-                best_viewing_hours: String::new(),
-            },
-            golden_hour_output: GoldenHourOutput {
-                sunrise_sunset: String::new(),
-                golden_hours: String::new(),
-                blue_hours: String::new(),
-                current_condition: String::new(),
-            },
-            tips_output: PhotographyTipsOutput {
-                equipment_recommendations: vec![],
-                shooting_tips: vec![],
-                location_suggestions: vec![],
-                technical_settings: vec![],
-                general_recommendations: vec![],
-            },
-        };
-        let formatted = format_dashboard_output(&output);
-        assert!(formatted.contains("ФОТОГРАФИЧЕСКИЙ ДАШБОРД"));
-    }
-
-    #[test]
     fn test_validate_coordinates_edge_cases() {
         // Граничные значения
         assert!(validate_coordinates(90.0, 180.0));
@@ -955,14 +626,6 @@ mod tests {
         assert_eq!(city, "Moscow");
         assert_eq!(lat, 55.7558);
         assert_eq!(lon, 37.6176);
-    }
-
-    #[test]
-    fn test_async_wrappers_empty_city() {
-        let rt = Runtime::new().unwrap();
-        // Пустой город не должен паниковать, но может вернуть ошибку
-        let result = rt.block_on(process_weather_data("demo_key".to_string(), "".to_string()));
-        assert!(result.is_ok() || result.is_err());
     }
 
     #[test]

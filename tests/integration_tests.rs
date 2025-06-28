@@ -71,8 +71,14 @@ async fn test_photography_dashboard_generate() {
     let city = "Moscow".to_string();
     let latitude = 55.7558;
     let longitude = 37.6176;
-    let dashboard = PhotographyDashboard::new(api_key, city, latitude, longitude);
-    let summary = dashboard.generate_dashboard().await;
+    let dashboard = PhotographyDashboard::new(city.clone(), latitude, longitude);
+    let aurora_probability = 1.0;
+    let weather_service = WeatherService::new(api_key, city);
+    let weather_forecast = weather_service.get_weather_forecast().await.unwrap();
+
+    let summary = dashboard
+        .generate_dashboard(&weather_forecast, aurora_probability)
+        .await;
     assert!(
         summary.is_ok(),
         "Dashboard summary should be generated successfully"

@@ -1,6 +1,7 @@
 /target
 .env
 /tarpaulin-report.html
+/cobertura.xml
 /README.md.backup
 
 # Devenv

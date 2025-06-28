@@ -16,7 +16,6 @@
 //!
 //! // Создаем дашборд
 //! let dashboard = PhotographyDashboard::new(
-//!     "api_key".to_string(),
 //!     "Moscow".to_string(),
 //!     55.7558,
 //!     37.6176,
@@ -32,11 +31,9 @@
 //! ```
 
 use crate::golden_hour::{GoldenHourInfo, GoldenHourService};
-use crate::solar::predict_aurora;
-use crate::weather::{analyze_weather_for_photography, WeatherAnalysis, WeatherService};
+use crate::weather::{analyze_weather_for_photography, WeatherAnalysis};
 use chrono::{DateTime, Local};
-use colored::*;
-use log::info;
+use log::debug;
 
 /// Сводка условий для фотографии
 #[derive(Debug, Clone)]
@@ -62,7 +59,6 @@ pub struct DashboardSummary {
 /// Объединяет данные о погоде, золотом часе и северных сияниях
 /// для создания персонализированной сводки условий съемки.
 pub struct PhotographyDashboard {
-    weather_service: WeatherService,
     golden_hour_service: GoldenHourService,
 }
 
@@ -71,7 +67,6 @@ impl PhotographyDashboard {
     ///
     /// # Аргументы
     ///
-    /// * `api_key` - API ключ для OpenWeather
     /// * `city` - Название города
     /// * `latitude` - Широта в градусах
     /// * `longitude` - Долгота в градусах
@@ -82,17 +77,15 @@ impl PhotographyDashboard {
     /// use my_dashboard::dashboard::PhotographyDashboard;
     ///
     /// let dashboard = PhotographyDashboard::new(
-    ///     "your_api_key".to_string(),
     ///     "Moscow".to_string(),
     ///     55.7558,
     ///     37.6176,
     /// );
     /// ```
-    pub fn new(api_key: String, city: String, latitude: f64, longitude: f64) -> Self {
-        info!("Создание дашборда для города: {}", city);
+    pub fn new(city: String, latitude: f64, longitude: f64) -> Self {
+        debug!("Создание дашборда для города: {}", city);
 
         Self {
-            weather_service: WeatherService::new(api_key, city),
             golden_hour_service: GoldenHourService::new(latitude, longitude),
         }
     }
@@ -113,7 +106,6 @@ impl PhotographyDashboard {
     ///
     /// // Создаем дашборд
     /// let dashboard = PhotographyDashboard::new(
-    ///     "api_key".to_string(),
     ///     "Moscow".to_string(),
     ///     55.7558,
     ///     37.6176,
@@ -127,27 +119,15 @@ impl PhotographyDashboard {
     /// //     Ok(())
     /// // }
     /// ```
-    pub async fn generate_dashboard(&self) -> Result<DashboardSummary, anyhow::Error> {
+    pub async fn generate_dashboard(
+        &self,
+        weather_forecast: &crate::weather::WeatherForecast,
+        aurora_probability: f64,
+    ) -> Result<DashboardSummary, anyhow::Error> {
         let current_time = Local::now();
 
-        // Получаем данные о погоде
-        let weather_forecast = match self.weather_service.get_weather_forecast().await {
-            Ok(forecast) => forecast,
-            Err(e) => {
-                eprintln!(
-                    "{}",
-                    "❌ ОШИБКА ПОЛУЧЕНИЯ ДАННЫХ ПОГОДЫ В ДАШБОРДЕ".bold().red()
-                );
-                eprintln!("Причина: {}", e);
-                eprintln!(
-                    "{}",
-                    "💡 РЕШЕНИЕ: Проверьте API ключ или используйте demo_key".yellow()
-                );
-                return Err(e);
-            }
-        };
-        let weather_analysis = analyze_weather_for_photography(&weather_forecast);
-
+        // Анализируем погоду
+        let weather_analysis = analyze_weather_for_photography(weather_forecast);
         // Получаем информацию о золотом часе
         let golden_hour_info = self
             .golden_hour_service
@@ -155,20 +135,6 @@ impl PhotographyDashboard {
 
         // Определяем, есть ли золотой час сегодня
         let is_golden_hour_today = self.is_golden_hour_today(&golden_hour_info, current_time);
-
-        // Получаем вероятность северных сияний
-        let aurora_probability = match predict_aurora().await {
-            Ok(forecast) => forecast.visibility_probability,
-            Err(e) => {
-                eprintln!(
-                    "{}",
-                    "❌ ОШИБКА ПОЛУЧЕНИЯ ДАННЫХ О СЕВЕРНЫХ СИЯНИЯХ".bold().red()
-                );
-                eprintln!("Причина: {}", e);
-                eprintln!("{}", "💡 РЕШЕНИЕ: Проверьте интернет-соединение".yellow());
-                return Err(e);
-            }
-        };
 
         // Создаем общую сводку
         let summary = self.create_summary(
@@ -263,70 +229,6 @@ impl PhotographyDashboard {
             "Сложные условия для съемки. Рекомендуется перенести съемку.".to_string()
         }
     }
-
-    pub fn print_dashboard(&self, summary: &DashboardSummary) {
-        println!("\n{}", "=== ФОТОГРАФИЧЕСКИЙ ДАШБОРД ===".bold().white());
-        println!("{}", "📊 ОБЩАЯ ОЦЕНКА".bold().cyan());
-        println!("   Погода: {:.1}/10", summary.weather_score);
-        println!(
-            "   Вероятность северных сияний: {:.0}%",
-            summary.aurora_probability * 100.0
-        );
-        println!(
-            "   Золотой час: {}",
-            if summary.is_golden_hour_today {
-                "Да"
-            } else {
-                "Нет"
-            }
-        );
-
-        if !summary.best_shooting_hours.is_empty() {
-            // Сжимаем часы до интервалов
-            let mut intervals = Vec::new();
-            let mut start = summary.best_shooting_hours[0];
-            let mut end = start;
-
-            for &hour in &summary.best_shooting_hours[1..] {
-                if hour == end + 1 {
-                    end = hour;
-                } else {
-                    if start == end {
-                        intervals.push(format!("{:02}:00", start));
-                    } else {
-                        intervals.push(format!("{:02}:00-{:02}:00", start, end));
-                    }
-                    start = hour;
-                    end = hour;
-                }
-            }
-            // Добавляем последний интервал
-            if start == end {
-                intervals.push(format!("{:02}:00", start));
-            } else {
-                intervals.push(format!("{:02}:00-{:02}:00", start, end));
-            }
-
-            println!("   Лучшие часы: {}", intervals.join(", "));
-        }
-
-        if !summary.key_highlights.is_empty() {
-            println!("{}", "✨ КЛЮЧЕВЫЕ МОМЕНТЫ".bold().green());
-            for highlight in &summary.key_highlights {
-                println!("   • {}", highlight);
-            }
-        }
-
-        if !summary.warnings.is_empty() {
-            println!("{}", "⚠️ ПРЕДУПРЕЖДЕНИЯ".bold().yellow());
-            for warning in &summary.warnings {
-                println!("   • {}", warning);
-            }
-        }
-
-        println!("{}", "🎯 РЕКОМЕНДАЦИЯ".bold().blue());
-        println!("   {}", summary.overall_recommendation);
-    }
 }
 
 #[cfg(test)]
@@ -334,6 +236,7 @@ mod tests {
     use super::*;
     use crate::weather::WeatherAnalysis;
     use chrono::{Local, NaiveDate, NaiveDateTime, TimeZone};
+    use pretty_assertions::assert_eq;
 
     // Вспомогательные функции для создания тестовых данных
     fn create_test_weather_analysis() -> WeatherAnalysis {
@@ -362,40 +265,22 @@ mod tests {
     }
 
     #[test]
-    fn test_photography_dashboard_new() {
-        let _dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
-    }
-
-    #[test]
     fn test_is_golden_hour_today() {
-        let _dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
+        let _dashboard = PhotographyDashboard::new("TestCity".to_string(), 55.7558, 37.6176);
 
         let golden_hour_info = create_test_golden_hour_info();
         let test_date = create_test_date();
 
         // В обычное время не должно быть золотого часа
-        let _is_golden = _dashboard.is_golden_hour_today(&golden_hour_info, test_date);
+        let is_golden = _dashboard.is_golden_hour_today(&golden_hour_info, test_date);
+
+        assert_eq!(is_golden, false);
         // Этот тест может быть нестабильным из-за реального времени, поэтому проверяем только логику
     }
 
     #[test]
     fn test_determine_overall_recommendation() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
+        let dashboard = PhotographyDashboard::new("TestCity".to_string(), 55.7558, 37.6176);
 
         // Тестируем разные сценарии
         let excellent = dashboard.determine_overall_recommendation(9.0, true);
@@ -412,12 +297,7 @@ mod tests {
 
     #[test]
     fn test_create_summary() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
+        let dashboard = PhotographyDashboard::new("TestCity".to_string(), 55.7558, 37.6176);
 
         let weather_analysis = create_test_weather_analysis();
         let golden_hour_info = create_test_golden_hour_info();
@@ -441,12 +321,7 @@ mod tests {
 
     #[test]
     fn test_create_summary_excellent_conditions() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
+        let dashboard = PhotographyDashboard::new("TestCity".to_string(), 55.7558, 37.6176);
 
         let mut excellent_weather = create_test_weather_analysis();
         excellent_weather.overall_score = 9.0;
@@ -475,12 +350,7 @@ mod tests {
 
     #[test]
     fn test_create_summary_poor_conditions() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
+        let dashboard = PhotographyDashboard::new("TestCity".to_string(), 55.7558, 37.6176);
 
         let mut poor_weather = create_test_weather_analysis();
         poor_weather.overall_score = 3.0;
@@ -528,12 +398,7 @@ mod tests {
 
     #[test]
     fn test_edge_cases() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
+        let dashboard = PhotographyDashboard::new("TestCity".to_string(), 55.7558, 37.6176);
 
         // Тестируем граничные значения
         let min_recommendation = dashboard.determine_overall_recommendation(0.0, false);
@@ -553,12 +418,7 @@ mod tests {
 
     #[test]
     fn test_aurora_probability_validation() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
+        let dashboard = PhotographyDashboard::new("TestCity".to_string(), 55.7558, 37.6176);
 
         let weather_analysis = create_test_weather_analysis();
         let golden_hour_info = create_test_golden_hour_info();
@@ -577,12 +437,7 @@ mod tests {
 
     #[test]
     fn test_golden_hour_precise_time_detection() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
+        let dashboard = PhotographyDashboard::new("TestCity".to_string(), 55.7558, 37.6176);
 
         let golden_hour_info = create_test_golden_hour_info();
         let test_date = create_test_date();
@@ -590,49 +445,5 @@ mod tests {
         // В обычное время не должно быть золотого часа
         let _is_golden = dashboard.is_golden_hour_today(&golden_hour_info, test_date);
         // Этот тест может быть нестабильным из-за реального времени, поэтому проверяем только логику
-    }
-
-    #[test]
-    fn test_dashboard_print_functionality() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
-
-        let summary = DashboardSummary {
-            overall_recommendation: "Отличный день для фотографии!".to_string(),
-            weather_score: 8.5,
-            aurora_probability: 0.7,
-            is_golden_hour_today: true,
-            best_shooting_hours: vec![6, 7, 8, 18, 19, 20],
-            key_highlights: vec!["Отличные условия".to_string()],
-            warnings: vec![],
-        };
-
-        dashboard.print_dashboard(&summary);
-    }
-
-    #[test]
-    fn test_dashboard_with_warnings() {
-        let dashboard = PhotographyDashboard::new(
-            "test_key".to_string(),
-            "TestCity".to_string(),
-            55.7558,
-            37.6176,
-        );
-
-        let summary = DashboardSummary {
-            overall_recommendation: "Сложные условия".to_string(),
-            weather_score: 3.0,
-            aurora_probability: 0.1,
-            is_golden_hour_today: false,
-            best_shooting_hours: vec![],
-            key_highlights: vec![],
-            warnings: vec!["Плохая погода".to_string(), "Нет золотого часа".to_string()],
-        };
-
-        dashboard.print_dashboard(&summary);
     }
 }

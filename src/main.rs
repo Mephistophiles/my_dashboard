@@ -13,7 +13,6 @@ async fn main() -> Result<(), anyhow::Error> {
     dotenv::dotenv().ok();
 
     info!("🚀 Запуск дашборда для фотографов...");
-    debug!("Отладочный режим включен");
 
     // Загружаем и валидируем параметры
     let (api_key, city, latitude, longitude) = load_environment_variables();

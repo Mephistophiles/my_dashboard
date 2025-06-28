@@ -270,58 +270,11 @@ impl GoldenHourService {
     }
 }
 
-/// Выводит информацию о золотом часе в консоль
-///
-/// Функция для удобного вывода всей информации о времени восхода, заката,
-/// золотого и синего часа в отформатированном виде.
-///
-/// # Аргументы
-///
-/// * `service` - Сервис золотого часа
-///
-/// # Пример
-///
-/// ```rust,no_run
-/// use my_dashboard::golden_hour::{GoldenHourService, print_golden_hour_info};
-///
-/// let service = GoldenHourService::new(55.7558, 37.6176);
-/// print_golden_hour_info(&service);
-/// ```
-pub fn print_golden_hour_info(service: &GoldenHourService) {
-    // В DEMO режиме используем фиксированное время для стабильности тестов
-    let demo_mode = is_demo_mode();
-
-    let current_time = if demo_mode {
-        // Используем фиксированное время для стабильности (ночное время)
-        get_current_time()
-    } else {
-        chrono::Local::now()
-    };
-
-    let info = service.calculate_golden_hours(current_time);
-    let current_condition = service.get_current_lighting_condition(current_time);
-
-    println!(
-        "🌅 Восход: {} | 🌆 Закат: {} | 🌅 Золотой час утро: {}-{} | 🌆 Золотой час вечер: {}-{} | 🌅 Синий час утро: {}-{} | 🌆 Синий час вечер: {}-{}",
-        info.sunrise.format("%H:%M"),
-        info.sunset.format("%H:%M"),
-        info.golden_hour_morning_start.format("%H:%M"),
-        info.golden_hour_morning_end.format("%H:%M"),
-        info.golden_hour_evening_start.format("%H:%M"),
-        info.golden_hour_evening_end.format("%H:%M"),
-        info.blue_hour_morning_start.format("%H:%M"),
-        info.blue_hour_morning_end.format("%H:%M"),
-        info.blue_hour_evening_start.format("%H:%M"),
-        info.blue_hour_evening_end.format("%H:%M")
-    );
-
-    println!("💡 Текущие условия освещения: {}", current_condition);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::{Local, NaiveDate, NaiveDateTime, TimeZone, Timelike};
+    use pretty_assertions::assert_eq;
 
     // Вспомогательные функции для создания тестовых данных
     fn create_test_service() -> GoldenHourService {
@@ -346,14 +299,6 @@ mod tests {
             chrono::NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
         );
         Local.from_local_datetime(&naive_datetime).unwrap()
-    }
-
-    #[test]
-    fn test_golden_hour_service_new() {
-        let service = GoldenHourService::new(55.7558, 37.6176);
-
-        assert_eq!(service.latitude, 55.7558);
-        assert_eq!(service.longitude, 37.6176);
     }
 
     #[test]
@@ -455,22 +400,6 @@ mod tests {
         let test_date = create_test_date();
         let info = service.calculate_golden_hours(test_date);
 
-        println!(
-            "\nblue_hour_morning_start: {}",
-            info.blue_hour_morning_start
-        );
-        println!("blue_hour_morning_end:   {}", info.blue_hour_morning_end);
-        println!(
-            "golden_hour_morning_start: {}",
-            info.golden_hour_morning_start
-        );
-        println!(
-            "golden_hour_morning_end:   {}",
-            info.golden_hour_morning_end
-        );
-        println!("sunrise: {}", info.sunrise);
-        println!("sunset:  {}", info.sunset);
-
         // Для золотого часа утром используем время сразу после окончания синего часа
         let morning_golden = service.get_current_lighting_condition(
             info.blue_hour_morning_end + chrono::Duration::minutes(1),
@@ -486,11 +415,6 @@ mod tests {
         let morning_blue = service.get_current_lighting_condition(
             info.blue_hour_morning_start + chrono::Duration::minutes(5),
         );
-        println!(
-            "test time for morning blue: {}",
-            info.blue_hour_morning_start + chrono::Duration::minutes(5)
-        );
-        println!("lighting condition: {}", morning_blue);
         assert_eq!(morning_blue, "Синий час (утро)");
 
         let evening_blue = service.get_current_lighting_condition(

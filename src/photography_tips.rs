@@ -231,38 +231,10 @@ impl Default for PhotographyTipsService {
     }
 }
 
-/// Выводит список советов в консоль с нумерацией
-///
-/// Функция для удобного отображения списка рекомендаций
-/// в пронумерованном виде.
-///
-/// # Аргументы
-///
-/// * `tips` - Список советов для вывода
-///
-/// # Пример
-///
-/// ```rust,no_run
-/// use my_dashboard::photography_tips::{PhotographyTipsService, print_photography_tips};
-///
-/// let service = PhotographyTipsService::new();
-/// let tips = service.get_general_recommendations();
-/// print_photography_tips(&tips);
-/// ```
-pub fn print_photography_tips(tips: &[String]) {
-    for (i, tip) in tips.iter().enumerate() {
-        println!("{}. {}", i + 1, tip);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_photography_tips_service_new() {
-        let _service = PhotographyTipsService::new();
-    }
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_get_tips_for_weather_good_conditions() {
